@@ -313,7 +313,7 @@ export function WorldMarketplace() {
     <main className="site-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Worldspot home"><span className="brand-mark">W</span><span>WORLDSPOT</span></a>
-        <nav className="nav-links" aria-label="Main navigation"><a href="#market">Market</a><a href="#how-it-works">How it works</a><a href="#rules">Rules</a></nav>
+        <nav className="nav-links" aria-label="Main navigation"><a href="#market">Market</a><a href="#leaderboard">Leaderboard</a><a href="#how-it-works">How it works</a><a href="#rules">Rules</a></nav>
         <div className="account-actions"><button className="theme-button" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`} aria-pressed={theme === 'dark'}><span aria-hidden="true">{theme === 'light' ? '☾' : '☀'}</span><span>{theme === 'light' ? 'Dark' : 'Light'}</span></button><a className="account-button" href="/signin-with-chatgpt?return_to=%2F">Sign in</a></div>
       </header>
 
@@ -322,6 +322,20 @@ export function WorldMarketplace() {
       <section className="intro" id="top">
         <div><p className="eyebrow"><span /> Global advertising, one country at a time</p><h1>Put your brand<br />on the world.</h1></div>
         <div className="intro-copy"><p>Choose a country, claim its spotlight, and stay visible until another brand raises the bid.</p><a href="#market">Explore the live map <span aria-hidden="true">↓</span></a></div>
+      </section>
+
+      <section className="market-pulse" aria-labelledby="market-pulse-title">
+        <div className="pulse-heading"><div><p className="section-kicker">Live attention</p><h2 id="market-pulse-title">Marketplace pulse</h2></div><p>Country clicks update continuously. Bid activity appears after a payment is securely accepted.</p></div>
+        <div className="pulse-grid">
+          <article className="pulse-card">
+            <div className="pulse-card-heading"><div><span className="pulse-dot" /> Trending now</div><small>Last 24 hours</small></div>
+            {trending.length ? <div className="trending-list">{trending.map((country, index) => <button type="button" key={country.code} onClick={() => selectCountry(country.code, country.name)}><span className="trend-rank">{String(index + 1).padStart(2, '0')}</span><span className="trend-flag">{countryFlag(country.code)}</span><span className="trend-country"><strong>{country.name}</strong><small>{country.totalClicks.toLocaleString()} total clicks</small></span><span className="trend-clicks">{country.clicks24h.toLocaleString()}<small>clicks</small></span></button>)}</div> : <div className="pulse-empty"><strong>No clicks yet</strong><span>Select a country to start the trend.</span></div>}
+          </article>
+          <article className="pulse-card">
+            <div className="pulse-card-heading"><div><span className="activity-mark">↗</span> Latest activity</div><small>Accepted bids</small></div>
+            {latestActivity.length ? <div className="activity-list">{latestActivity.map((activity, index) => <button type="button" key={`${activity.code}-${activity.completedAt}-${index}`} onClick={() => selectCountry(activity.code, activity.countryName)}><span className="trend-flag">{countryFlag(activity.code)}</span><span className="trend-country"><strong>{activity.companyName} claimed {activity.countryName}</strong><small>{activity.projectCategory ?? 'Brand placement'} · {activityTime(activity.completedAt)}</small></span><span className="activity-price">{money.format(activity.amount)}</span></button>)}</div> : <div className="pulse-empty"><strong>No accepted bids yet</strong><span>The newest successful claim will appear here.</span></div>}
+          </article>
+        </div>
       </section>
 
       <section className="market" id="market" aria-label="Live country marketplace">
@@ -370,7 +384,7 @@ export function WorldMarketplace() {
           </div>
         </div>
 
-        <aside className="leaderboard" aria-labelledby="leaderboard-title">
+        <aside className="leaderboard" id="leaderboard" aria-labelledby="leaderboard-title">
           <div className="leaderboard-heading"><div><p className="section-kicker">Leaderboard</p><h2 id="leaderboard-title">Most valued</h2></div><span className="live-pill"><i /> {liveData ? 'Live' : 'Preview'}</span></div>
           {spots.length > 0 ? <div className="leaderboard-list">{spots.slice(0, 6).map((country, index) => (
             <button key={country.code} className="leader-row" onClick={() => setSelected(country)} type="button">
@@ -382,20 +396,6 @@ export function WorldMarketplace() {
           ))}</div> : <div className="empty-leaderboard"><span>01</span><h3>Be first on the map</h3><p>Every country opens at $100.</p></div>}
           <div className="leaderboard-note"><span>{spots.length}</span><p><strong>{spots.length === 1 ? 'brand is' : 'brands are'} live</strong><br />across the map right now.</p></div>
         </aside>
-      </section>
-
-      <section className="market-pulse" aria-labelledby="market-pulse-title">
-        <div className="pulse-heading"><div><p className="section-kicker">Live attention</p><h2 id="market-pulse-title">Marketplace pulse</h2></div><p>Country clicks update continuously. Bid activity appears after a payment is securely accepted.</p></div>
-        <div className="pulse-grid">
-          <article className="pulse-card">
-            <div className="pulse-card-heading"><div><span className="pulse-dot" /> Trending now</div><small>Last 24 hours</small></div>
-            {trending.length ? <div className="trending-list">{trending.map((country, index) => <button type="button" key={country.code} onClick={() => selectCountry(country.code, country.name)}><span className="trend-rank">{String(index + 1).padStart(2, '0')}</span><span className="trend-flag">{countryFlag(country.code)}</span><span className="trend-country"><strong>{country.name}</strong><small>{country.totalClicks.toLocaleString()} total clicks</small></span><span className="trend-clicks">{country.clicks24h.toLocaleString()}<small>clicks</small></span></button>)}</div> : <div className="pulse-empty"><strong>No clicks yet</strong><span>Select a country to start the trend.</span></div>}
-          </article>
-          <article className="pulse-card">
-            <div className="pulse-card-heading"><div><span className="activity-mark">↗</span> Latest activity</div><small>Accepted bids</small></div>
-            {latestActivity.length ? <div className="activity-list">{latestActivity.map((activity, index) => <button type="button" key={`${activity.code}-${activity.completedAt}-${index}`} onClick={() => selectCountry(activity.code, activity.countryName)}><span className="trend-flag">{countryFlag(activity.code)}</span><span className="trend-country"><strong>{activity.companyName} claimed {activity.countryName}</strong><small>{activity.projectCategory ?? 'Brand placement'} · {activityTime(activity.completedAt)}</small></span><span className="activity-price">{money.format(activity.amount)}</span></button>)}</div> : <div className="pulse-empty"><strong>No accepted bids yet</strong><span>The newest successful claim will appear here.</span></div>}
-          </article>
-        </div>
       </section>
 
       <section className="how-it-works" id="how-it-works">
