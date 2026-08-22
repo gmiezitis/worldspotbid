@@ -112,6 +112,10 @@ export function WorldMarketplace() {
   const [latestActivity, setLatestActivity] = useState<LatestActivity[]>([]);
   const [clickCounts, setClickCounts] = useState<Record<string, number>>({});
   const mapViewportRef = useRef<HTMLDivElement>(null);
+  const mapZoomRef = useRef(1);
+  const wheelZoomFrameRef = useRef<number | null>(null);
+  const wheelDeltaRef = useRef(0);
+  const wheelFocusRef = useRef({ clientX: 0, clientY: 0 });
   const mapDragRef = useRef({ pointerId: -1, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0, moved: false });
 
   const spotMap = useMemo(() => new Map(spots.map((spot) => [spot.code, spot])), [spots]);
@@ -219,16 +223,18 @@ export function WorldMarketplace() {
 
   const setMapZoom = useCallback((nextZoom: number, focus?: { clientX: number; clientY: number }) => {
     const viewport = mapViewportRef.current;
+    const currentZoom = mapZoomRef.current;
     const next = Math.min(3, Math.max(1, nextZoom));
-    if (!viewport || next === mapZoom) return;
+    if (!viewport || next === currentZoom) return;
 
     const bounds = viewport.getBoundingClientRect();
     const offsetX = focus ? focus.clientX - bounds.left : viewport.clientWidth / 2;
     const offsetY = focus ? focus.clientY - bounds.top : viewport.clientHeight / 2;
     const contentX = viewport.scrollLeft + offsetX;
     const contentY = viewport.scrollTop + offsetY;
-    const scale = next / mapZoom;
+    const scale = next / currentZoom;
 
+    mapZoomRef.current = next;
     setMapZoomState(next);
     window.requestAnimationFrame(() => {
       const current = mapViewportRef.current;
@@ -236,7 +242,7 @@ export function WorldMarketplace() {
       current.scrollLeft = contentX * scale - offsetX;
       current.scrollTop = contentY * scale - offsetY;
     });
-  }, [mapZoom]);
+  }, []);
 
   useEffect(() => {
     const viewport = mapViewportRef.current;
@@ -244,19 +250,30 @@ export function WorldMarketplace() {
     const handleWheel = (event: WheelEvent) => {
       if (event.deltaY === 0) return;
       event.preventDefault();
-      setMapZoom(mapZoom + (event.deltaY < 0 ? 0.25 : -0.25), {
-        clientX: event.clientX,
-        clientY: event.clientY,
+      const deltaScale = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? viewport.clientHeight : 1;
+      wheelDeltaRef.current += event.deltaY * deltaScale;
+      wheelFocusRef.current = { clientX: event.clientX, clientY: event.clientY };
+      if (wheelZoomFrameRef.current !== null) return;
+      wheelZoomFrameRef.current = window.requestAnimationFrame(() => {
+        wheelZoomFrameRef.current = null;
+        const delta = wheelDeltaRef.current;
+        wheelDeltaRef.current = 0;
+        const zoomChange = Math.max(-0.18, Math.min(0.18, -delta * 0.0015));
+        setMapZoom(mapZoomRef.current + zoomChange, wheelFocusRef.current);
       });
     };
     viewport.addEventListener('wheel', handleWheel, { passive: false });
-    return () => viewport.removeEventListener('wheel', handleWheel);
-  }, [mapZoom, setMapZoom]);
+    return () => {
+      viewport.removeEventListener('wheel', handleWheel);
+      if (wheelZoomFrameRef.current !== null) window.cancelAnimationFrame(wheelZoomFrameRef.current);
+    };
+  }, [setMapZoom]);
 
   const startMapDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
     const viewport = mapViewportRef.current;
     if (!viewport) return;
+    event.preventDefault();
     mapDragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop, moved: false };
     viewport.setPointerCapture(event.pointerId);
     setMapDragging(true);
@@ -275,6 +292,8 @@ export function WorldMarketplace() {
 
   const stopMapDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (mapDragRef.current.pointerId !== event.pointerId) return;
+    const viewport = mapViewportRef.current;
+    if (viewport?.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
     mapDragRef.current.pointerId = -1;
     setMapDragging(false);
   };
