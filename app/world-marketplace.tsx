@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PROJECT_CATEGORIES } from '../lib/categories';
 
 type WorldMapData = { viewBox: string; locations: Array<{ id: string; name: string; path: string }> };
 
@@ -11,6 +12,7 @@ type CountrySpot = {
   currentBid: number;
   companyName?: string;
   companyUrl?: string;
+  projectCategory?: string;
   logoUrl?: string;
   minimumGuaranteedUntil?: number;
 };
@@ -58,6 +60,7 @@ export function WorldMarketplace() {
   const [bidOpen, setBidOpen] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [companyUrl, setCompanyUrl] = useState('https://');
+  const [projectCategory, setProjectCategory] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -127,7 +130,7 @@ export function WorldMarketplace() {
   const selectCountry = (code: string, name: string) => setSelected(spotMap.get(code) ?? availableSpot(code, name));
   const nextBid = selected.currentBid === 0 ? 100 : selected.currentBid + 100;
 
-  const setMapZoom = (nextZoom: number) => {
+  const setMapZoom = useCallback((nextZoom: number) => {
     const viewport = mapViewportRef.current;
     const next = Math.min(3, Math.max(1, nextZoom));
     const centerX = viewport ? (viewport.scrollLeft + viewport.clientWidth / 2) / Math.max(viewport.scrollWidth, 1) : 0.5;
@@ -139,7 +142,19 @@ export function WorldMarketplace() {
       current.scrollLeft = centerX * current.scrollWidth - current.clientWidth / 2;
       current.scrollTop = centerY * current.scrollHeight - current.clientHeight / 2;
     });
-  };
+  }, []);
+
+  useEffect(() => {
+    const viewport = mapViewportRef.current;
+    if (!viewport) return;
+    const handleWheel = (event: WheelEvent) => {
+      if (event.deltaY === 0) return;
+      event.preventDefault();
+      setMapZoom(mapZoom + (event.deltaY < 0 ? 0.25 : -0.25));
+    };
+    viewport.addEventListener('wheel', handleWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', handleWheel);
+  }, [mapZoom, setMapZoom]);
 
   const startMapDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
@@ -181,7 +196,7 @@ export function WorldMarketplace() {
       const checkoutResponse = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ countryCode: selected.code, companyName, companyUrl, logoKey: logo.key }),
+        body: JSON.stringify({ countryCode: selected.code, companyName, companyUrl, projectCategory, logoKey: logo.key }),
       });
       const checkout = await checkoutResponse.json() as { url?: string; error?: string };
       if (!checkoutResponse.ok || !checkout.url) throw new Error(checkout.error ?? 'Could not start checkout.');
@@ -257,7 +272,7 @@ export function WorldMarketplace() {
             <button key={country.code} className="leader-row" onClick={() => setSelected(country)} type="button">
               <span className="rank">{String(index + 1).padStart(2, '0')}</span>
               <span className="company-chip" style={{ background: palette[index % palette.length] }}>{country.logoUrl ? <span className="leader-logo" style={{ backgroundImage: `url(${country.logoUrl})` }} /> : brandInitials(country.companyName)}</span>
-              <span className="leader-name"><strong>{country.name}</strong><small>{country.companyName} · {timeLabel(country.minimumGuaranteedUntil)}</small></span>
+              <span className="leader-name"><strong>{country.name}</strong><small>{country.companyName}{country.projectCategory ? ` · ${country.projectCategory}` : ''} · {timeLabel(country.minimumGuaranteedUntil)}</small></span>
               <span className="leader-price">{money.format(country.currentBid)}</span>
             </button>
           ))}</div> : <div className="empty-leaderboard"><span>01</span><h3>Be first on the map</h3><p>Every country opens at $100.</p></div>}
@@ -280,6 +295,7 @@ export function WorldMarketplace() {
           {!paymentsEnabled && liveData ? <div className="setup-message"><strong>Secure checkout is not live yet.</strong><p>The marketplace is ready for Stripe test keys before accepting any payment.</p></div> : <form onSubmit={submitBid}>
             <label>Company name<input required minLength={2} maxLength={60} value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Acme Studio" /></label>
             <label>Company website<input required type="url" value={companyUrl} onChange={(event) => setCompanyUrl(event.target.value)} placeholder="https://example.com" /></label>
+            <label>Project category<select required value={projectCategory} onChange={(event) => setProjectCategory(event.target.value)}><option value="" disabled>Choose a category</option>{PROJECT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
             <label>Company logo <small>PNG, JPG, or WebP · max 750 KB</small><input required type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)} /></label>
             {formError && <p className="form-error" role="alert">{formError}</p>}
             <button className="checkout-button" disabled={submitting} type="submit">{submitting ? 'Preparing secure checkout…' : `Continue to Stripe · ${money.format(nextBid)}`}</button>
