@@ -18,6 +18,7 @@ type CountrySpot = {
   projectCategory?: string;
   logoUrl?: string;
   minimumGuaranteedUntil?: number;
+  isDemo?: boolean;
 };
 
 type TrendingCountry = { code: string; name: string; clicks24h: number; totalClicks: number };
@@ -25,13 +26,13 @@ type LatestActivity = { code: string; countryName: string; amount: number; compa
 type CharityStats = { monthLabel: string; totalVotes: number; totalPledgedCents: number; causes: Array<{ id: CharityCause; votes: number; pledgedCents: number }> };
 
 const previewSpots: CountrySpot[] = [
-  { code: 'us', name: 'United States', flag: '🇺🇸', currentBid: 4200, companyName: 'NORTHSTAR', businessDescription: 'AI tools for ambitious global teams.' },
-  { code: 'gb', name: 'United Kingdom', flag: '🇬🇧', currentBid: 3100, companyName: 'MONO', businessDescription: 'Simple financial planning for founders.' },
-  { code: 'jp', name: 'Japan', flag: '🇯🇵', currentBid: 2700, companyName: 'SORA', businessDescription: 'Creative software for modern studios.' },
-  { code: 'de', name: 'Germany', flag: '🇩🇪', currentBid: 1900, companyName: 'KERN', businessDescription: 'Industrial design and engineering.' },
-  { code: 'br', name: 'Brazil', flag: '🇧🇷', currentBid: 1600, companyName: 'VERDE', businessDescription: 'Sustainable commerce for local brands.' },
-  { code: 'fr', name: 'France', flag: '🇫🇷', currentBid: 1200, companyName: 'AVENIR', businessDescription: 'Independent fashion and culture.' },
-  { code: 'lv', name: 'Latvia', flag: '🇱🇻', currentBid: 500, companyName: 'RIGA', businessDescription: 'Digital products built in the Baltics.' },
+  { code: 'us', name: 'United States', flag: '🇺🇸', currentBid: 0, companyName: 'NORTHSTAR', businessDescription: 'AI tools for ambitious global teams.', logoUrl: '/demo-northstar.png', isDemo: true },
+  { code: 'gb', name: 'United Kingdom', flag: '🇬🇧', currentBid: 0, companyName: 'MONO', businessDescription: 'Simple financial planning for founders.', isDemo: true },
+  { code: 'jp', name: 'Japan', flag: '🇯🇵', currentBid: 0, companyName: 'SORA', businessDescription: 'Creative software for modern studios.', isDemo: true },
+  { code: 'de', name: 'Germany', flag: '🇩🇪', currentBid: 0, companyName: 'KERN', businessDescription: 'Industrial design and engineering.', isDemo: true },
+  { code: 'br', name: 'Brazil', flag: '🇧🇷', currentBid: 0, companyName: 'VERDE', businessDescription: 'Sustainable commerce for local brands.', isDemo: true },
+  { code: 'fr', name: 'France', flag: '🇫🇷', currentBid: 0, companyName: 'AVENIR', businessDescription: 'Independent fashion and culture.', isDemo: true },
+  { code: 'lv', name: 'Latvia', flag: '🇱🇻', currentBid: 0, companyName: 'RIGA', businessDescription: 'Digital products built in the Baltics.', isDemo: true },
 ];
 
 const palette = ['#f4bd42', '#e9704e', '#ec6680', '#8b79d9', '#62ad76', '#568bd6', '#9e3943'];
@@ -154,10 +155,11 @@ export function WorldMarketplace() {
       const data = await response.json() as { countries?: Array<Omit<CountrySpot, 'flag'>>; paymentsEnabled?: boolean };
       const next = (data.countries ?? []).map((country) => ({ ...country, flag: countryFlag(country.code) }));
       const nextMap = new Map(next.map((spot) => [spot.code, spot]));
-      setSpots(next);
-      setLiveData(true);
+      const visibleSpots = next.length > 0 ? next : previewSpots;
+      setSpots(visibleSpots);
+      setLiveData(next.length > 0);
       setPaymentsEnabled(Boolean(data.paymentsEnabled));
-      setSelected((current) => nextMap.get(current.code) ?? availableSpot(current.code, current.name));
+      setSelected((current) => nextMap.get(current.code) ?? visibleSpots.find((spot) => spot.code === current.code) ?? availableSpot(current.code, current.name));
     } catch { /* retain the clearly labelled preview data */ }
   }, []);
 
@@ -294,10 +296,7 @@ export function WorldMarketplace() {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const viewport = mapViewportRef.current;
     if (!viewport) return;
-    event.preventDefault();
     mapDragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop, moved: false };
-    viewport.setPointerCapture(event.pointerId);
-    setMapDragging(true);
   };
 
   const moveMap = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -306,7 +305,12 @@ export function WorldMarketplace() {
     if (!viewport || drag.pointerId !== event.pointerId) return;
     const deltaX = event.clientX - drag.startX;
     const deltaY = event.clientY - drag.startY;
-    if (Math.abs(deltaX) + Math.abs(deltaY) > 5) drag.moved = true;
+    if (!drag.moved && Math.abs(deltaX) + Math.abs(deltaY) > 5) {
+      drag.moved = true;
+      viewport.setPointerCapture(event.pointerId);
+      setMapDragging(true);
+    }
+    if (!drag.moved) return;
     viewport.scrollLeft = drag.scrollLeft - deltaX;
     viewport.scrollTop = drag.scrollTop - deltaY;
   };
@@ -405,7 +409,7 @@ export function WorldMarketplace() {
                 const isSelected = selected.code === location.id;
                 const hiddenBySearch = query.length > 0 && !matchingCodes.has(location.id);
                 const fill = spot?.logoUrl ? `url(#logo-${spot.code})` : spot ? `url(#brand-${spot.code})` : undefined;
-                return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={fill ? { fill } : undefined} role="button" tabIndex={0} aria-label={`${location.name}, ${spot ? `${money.format(spot.currentBid)} current value` : 'available from $50'}`} onClick={() => { if (!mapDragRef.current.moved) selectCountry(location.id, location.name, true); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name, true); } }} />;
+                return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={fill ? { fill } : undefined} role="button" tabIndex={0} aria-label={`${location.name}, ${spot?.isDemo ? 'available from $50 with a demo brand preview' : spot ? `${money.format(spot.currentBid)} current value` : 'available from $50'}`} onClick={() => { if (!mapDragRef.current.moved) selectCountry(location.id, location.name, true); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name, true); } }} />;
               })}
             </svg> : <div className="map-loading" role="status">Loading the world map…</div>}
               </div>
@@ -418,9 +422,9 @@ export function WorldMarketplace() {
             </div>
             {mapBidCardOpen && <aside className="map-bid-card" aria-label={`Bid on ${selected.name}`} onPointerDown={(event) => event.stopPropagation()}>
               <button className="map-card-close" type="button" onClick={() => setMapBidCardOpen(false)} aria-label="Close selected country">×</button>
-              <div className="map-card-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><small>Selected country</small><strong>{selected.name}</strong></div></div>
+              <div className="map-card-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><small>Selected country</small><strong>{selected.name}</strong>{selected.companyName && <span className="map-card-brand">{selected.companyName}{selected.isDemo ? ' · Demo preview' : ''}</span>}</div></div>
               <div className="map-card-values"><span><small>Current value</small><strong>{selected.currentBid ? money.format(selected.currentBid) : 'Available'}</strong></span><span><small>Your bid</small><strong>{money.format(nextBid)}</strong></span></div>
-              <button className="primary-button" type="button" onClick={() => { setFormError(''); setBidOpen(true); }}>Bid now · {money.format(nextBid)}</button>
+              <button className="primary-button" type="button" onClick={() => { setFormError(''); setBidOpen(true); }}>Claim {selected.name} · {money.format(nextBid)}</button>
             </aside>}
             <div className="map-legend" aria-hidden="true"><span><i className="legend-available" /> Available</span><span><i className="legend-owned" /> Brand live</span></div>
             <p className="map-credit">Map © SVG Maps, CC BY 4.0</p>
@@ -442,7 +446,7 @@ export function WorldMarketplace() {
               <span className="rank">{String(index + 1).padStart(2, '0')}</span>
               <span className="company-chip" style={{ background: palette[index % palette.length] }}>{country.logoUrl ? <span className="leader-logo" style={{ backgroundImage: `url(${country.logoUrl})` }} /> : brandInitials(country.companyName)}</span>
               <span className="leader-name"><strong>{country.name}</strong><small>{country.companyName}{country.projectCategory ? ` · ${country.projectCategory}` : ''} · {timeLabel(country.minimumGuaranteedUntil)}</small></span>
-              <span className="leader-price">{money.format(country.currentBid)}</span>
+              <span className="leader-price">{country.isDemo ? 'Demo' : money.format(country.currentBid)}</span>
             </button>
           ))}</div> : <div className="empty-leaderboard"><span>01</span><h3>Be first on the map</h3><p>Every country opens at $100.</p></div>}
           <div className="leaderboard-note"><span>{spots.length}</span><p><strong>{spots.length === 1 ? 'brand is' : 'brands are'} live</strong><br />across the map right now.</p></div>
