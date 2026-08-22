@@ -36,6 +36,13 @@
       "when": 1787399179424,
       "tag": "0004_sparkling_magneto",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787421180268,
+      "tag": "0005_flippant_quicksilver",
+      "breakpoints": true
     }
   ]
 }
