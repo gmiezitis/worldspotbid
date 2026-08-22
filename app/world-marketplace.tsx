@@ -125,7 +125,7 @@ export function WorldMarketplace() {
   const [charityCause, setCharityCause] = useState<CharityCause>('children');
   const [colorfulBorder, setColorfulBorder] = useState(false);
   const [charityStats, setCharityStats] = useState<CharityStats | null>(null);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [, setLogoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
@@ -365,23 +365,23 @@ export function WorldMarketplace() {
     setFormError('');
     setSubmitting(true);
     try {
-      let logoKey = '';
-      if (logoFile) {
-        const logoBody = new FormData();
-        logoBody.append('logo', logoFile);
-        const logoResponse = await fetch('/api/logo', { method: 'POST', body: logoBody });
-        const logo = await logoResponse.json() as { key?: string; error?: string };
-        if (!logoResponse.ok || !logo.key) throw new Error(logo.error ?? 'Could not upload the logo.');
-        logoKey = logo.key;
-      }
-      const checkoutResponse = await fetch('/api/checkout', {
+      const checkoutResponse = await fetch('/api/bid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ countryCode: selected.code, companyName, companyUrl, businessDescription, projectCategory, charityCause, colorfulBorder, logoKey }),
+        body: JSON.stringify({
+          country_code: selected.code,
+          logo_url: null,
+          link_url: companyUrl,
+          company_name: companyName,
+          business_description: businessDescription,
+          project_category: projectCategory,
+          charity_cause: charityCause,
+          colorful_border: colorfulBorder,
+        }),
       });
-      const checkout = await checkoutResponse.json() as { url?: string; error?: string };
-      if (!checkoutResponse.ok || !checkout.url) throw new Error(checkout.error ?? 'Could not start checkout.');
-      window.location.assign(checkout.url);
+      const checkout = await checkoutResponse.json() as { checkout_url?: string; error?: string };
+      if (!checkoutResponse.ok || !checkout.checkout_url) throw new Error(checkout.error ?? 'Could not start checkout.');
+      window.location.assign(checkout.checkout_url);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not start checkout.';
       if (message.toLowerCase().includes('sign in')) setFormError('Please sign in first, then open this country again.');
