@@ -43,7 +43,7 @@ a { color: inherit; text-decoration: none; }
 .map-wrap { position: relative; overflow: hidden; height: clamp(560px, 48vw, 760px); border: 1px solid #dfddd6; border-radius: 18px; background: #e9eee7; background-image: radial-gradient(circle at 50% 45%, rgba(255,255,255,.8), rgba(255,255,255,0) 55%); }
 .map-viewport { width: 100%; height: 100%; overflow: auto; cursor: grab; overscroll-behavior: contain; scrollbar-color: #aebbb3 transparent; }
 .map-viewport.map-dragging { cursor: grabbing; user-select: none; }
-.map-stage { min-width: 100%; min-height: 100%; display: grid; place-items: center; transition: width .22s ease, height .22s ease; }
+.map-stage { min-width: 100%; min-height: 100%; display: grid; place-items: center; }
 .map-viewport svg { width: 96%; height: auto; max-height: 96%; filter: drop-shadow(0 7px 12px rgba(32,62,52,.08)); }
 .map-controls { position: absolute; z-index: 4; top: 14px; left: 14px; width: fit-content; height: 38px; display: flex; align-items: center; overflow: hidden; border: 1px solid rgba(23,35,31,.13); border-radius: 10px; background: rgba(251,250,246,.92); box-shadow: 0 5px 18px rgba(23,35,31,.1); backdrop-filter: blur(8px); cursor: default; }
 .map-controls button { width: 38px; height: 38px; border: 0; color: var(--ink); background: transparent; cursor: pointer; font-size: 20px; font-weight: 700; }
