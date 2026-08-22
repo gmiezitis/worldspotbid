@@ -4,6 +4,7 @@ import { getD1 } from '../../../db';
 import { getCountry } from '../../../lib/countries';
 import { isProjectCategory } from '../../../lib/categories';
 import { BID_INCREMENT_CENTS } from '../../../lib/bidding';
+import { isCharityCause } from '../../../lib/charity';
 import { ApiError, assertSameOrigin, cleanCompanyUrl, cleanText, jsonError, readJsonObject } from '../../../lib/security';
 import { getStripe, trustedAppOrigin } from '../../../lib/stripe';
 
@@ -25,6 +26,8 @@ export async function POST(request: Request) {
     const businessDescription = cleanText(body.businessDescription, 'Business description', 10, 180);
     if (!isProjectCategory(body.projectCategory)) throw new ApiError(400, 'Choose a valid project category.');
     const projectCategory = body.projectCategory;
+    if (!isCharityCause(body.charityCause)) throw new ApiError(400, 'Choose a charity cause.');
+    const charityCause = body.charityCause;
     let logoKey = '';
     if (body.logoKey !== undefined && body.logoKey !== null && body.logoKey !== '') {
       logoKey = cleanText(body.logoKey, 'Logo', 40, 160);
@@ -45,9 +48,9 @@ export async function POST(request: Request) {
     await db.prepare(`
       INSERT INTO bid_orders (
         id, country_code, country_name, user_id, bidder_email, amount_cents,
-        expected_version, company_name, company_url, business_description, project_category, logo_key, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'creating_checkout', ?, ?)
-    `).bind(orderId, country.code, country.name, user.userId, user.email, amountCents, current.version, companyName, companyUrl, businessDescription, projectCategory, logoKey, now, now).run();
+        expected_version, company_name, company_url, business_description, project_category, charity_cause, logo_key, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'creating_checkout', ?, ?)
+    `).bind(orderId, country.code, country.name, user.userId, user.email, amountCents, current.version, companyName, companyUrl, businessDescription, projectCategory, charityCause, logoKey, now, now).run();
 
     const origin = trustedAppOrigin(request);
     const session = await getStripe().checkout.sessions.create({
@@ -58,10 +61,10 @@ export async function POST(request: Request) {
       expires_at: Math.floor(now / 1000) + 30 * 60,
       success_url: `${origin}/?payment=processing&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/?payment=cancelled`,
-      metadata: { orderId, countryCode: country.code, expectedVersion: String(current.version) },
+      metadata: { orderId, countryCode: country.code, expectedVersion: String(current.version), charityCause },
       payment_intent_data: {
         capture_method: 'manual',
-        metadata: { orderId, countryCode: country.code },
+        metadata: { orderId, countryCode: country.code, charityCause },
       },
       line_items: [{
         quantity: 1,
