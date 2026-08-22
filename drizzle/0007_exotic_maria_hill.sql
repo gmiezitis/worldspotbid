@@ -1,0 +1,1 @@
+CREATE INDEX `idx_bid_orders_country_status_completed` ON `bid_orders` (`country_code`,`status`,`completed_at`);
