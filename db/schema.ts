@@ -6,6 +6,9 @@ export const countries = sqliteTable('countries', {
   currentBidCents: integer('current_bid_cents').notNull().default(0),
   companyName: text('company_name', { length: 60 }),
   companyUrl: text('company_url', { length: 500 }),
+  businessDescription: text('business_description', { length: 180 }),
+  projectCategory: text('project_category', { length: 60 }),
+  colorfulBorder: integer('colorful_border', { mode: 'boolean' }).notNull().default(false),
   logoKey: text('logo_key', { length: 160 }),
   ownerUserId: text('owner_user_id', { length: 160 }),
   activeSince: integer('active_since', { mode: 'timestamp_ms' }),
@@ -29,6 +32,11 @@ export const bidOrders = sqliteTable('bid_orders', {
   expectedVersion: integer('expected_version').notNull(),
   companyName: text('company_name', { length: 60 }).notNull(),
   companyUrl: text('company_url', { length: 500 }).notNull(),
+  businessDescription: text('business_description', { length: 180 }),
+  projectCategory: text('project_category', { length: 60 }),
+  charityCause: text('charity_cause', { length: 32 }),
+  colorfulBorder: integer('colorful_border', { mode: 'boolean' }).notNull().default(false),
+  borderAddonCents: integer('border_addon_cents').notNull().default(0),
   logoKey: text('logo_key', { length: 160 }).notNull(),
   status: text('status', { length: 32 }).notNull(),
   failureReason: text('failure_reason', { length: 160 }),
@@ -40,6 +48,8 @@ export const bidOrders = sqliteTable('bid_orders', {
   index('idx_bid_orders_country_created').on(table.countryCode, table.createdAt),
   index('idx_bid_orders_user_created').on(table.userId, table.createdAt),
   index('idx_bid_orders_status').on(table.status),
+  index('idx_bid_orders_status_completed').on(table.status, table.completedAt),
+  index('idx_bid_orders_country_status_completed').on(table.countryCode, table.status, table.completedAt),
 ]);
 
 export const webhookEvents = sqliteTable('webhook_events', {
@@ -55,3 +65,20 @@ export const logoUploads = sqliteTable('logo_uploads', {
   contentType: text('content_type', { length: 40 }).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (table) => [index('idx_logo_uploads_user_created').on(table.userId, table.createdAt)]);
+
+export const countryClickEvents = sqliteTable('country_click_events', {
+  id: text('id', { length: 36 }).primaryKey(),
+  countryCode: text('country_code', { length: 2 }).notNull(),
+  visitorId: text('visitor_id', { length: 36 }).notNull(),
+  clickedAt: integer('clicked_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('idx_country_click_events_country_time').on(table.countryCode, table.clickedAt),
+  index('idx_country_click_events_visitor_time').on(table.visitorId, table.clickedAt),
+  index('idx_country_click_events_time_country').on(table.clickedAt, table.countryCode),
+]);
+
+export const countryClickTotals = sqliteTable('country_click_totals', {
+  countryCode: text('country_code', { length: 2 }).primaryKey(),
+  clickCount: integer('click_count').notNull().default(0),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+});

@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { getD1 } from '../../../db';
+import { BID_INCREMENT_CENTS } from '../../../lib/bidding';
 import { ApiError, jsonError } from '../../../lib/security';
 import { getStripe, getWebhookSecret } from '../../../lib/stripe';
 
@@ -14,6 +15,10 @@ type OrderRow = {
   expected_version: number;
   company_name: string;
   company_url: string;
+  business_description: string | null;
+  project_category: string | null;
+  colorful_border: number;
+  border_addon_cents: number;
   logo_key: string;
   status: string;
 };
@@ -39,6 +44,9 @@ async function acceptBid(event: Stripe.Event, session: Stripe.Checkout.Session) 
   const db = getD1();
   const order = await db.prepare(`SELECT * FROM bid_orders WHERE id = ? AND stripe_session_id = ?`).bind(orderId, session.id).first<OrderRow>();
   if (!order) throw new ApiError(400, 'Unknown checkout order.');
+  const expectedTotalCents = Number(order.amount_cents) + Number(order.border_addon_cents);
+  if (session.amount_total !== expectedTotalCents || session.currency !== 'usd') throw new ApiError(400, 'Checkout total does not match the bid order.');
+  if (session.metadata?.colorfulBorder !== String(Boolean(order.colorful_border))) throw new ApiError(400, 'Checkout border option does not match the bid order.');
   if (['accepted', 'stale', 'payment_failed'].includes(order.status)) {
     await markEvent(event);
     return;
@@ -52,7 +60,7 @@ async function acceptBid(event: Stripe.Event, session: Stripe.Checkout.Session) 
     SET pending_bid_id = ?, pending_bid_cents = ?, pending_bid_expires_at = ?, updated_at = ?
     WHERE code = ? AND version = ? AND current_bid_cents = ?
       AND (pending_bid_id IS NULL OR pending_bid_id = ? OR pending_bid_expires_at < ?)
-  `).bind(orderId, order.amount_cents, now + 10 * 60_000, now, order.country_code, order.expected_version, order.amount_cents - 10_000, orderId, now).run();
+  `).bind(orderId, order.amount_cents, now + 10 * 60_000, now, order.country_code, order.expected_version, order.amount_cents - BID_INCREMENT_CENTS, orderId, now).run();
 
   if (Number(acquired.meta.changes ?? 0) !== 1) {
     await cancelAuthorization(paymentIntentId);
@@ -87,11 +95,11 @@ async function acceptBid(event: Stripe.Event, session: Stripe.Checkout.Session) 
       WHERE id = ? AND EXISTS (SELECT 1 FROM countries WHERE code = ? AND pending_bid_id = ?)
     `).bind(completedAt, completedAt, orderId, order.country_code, orderId),
     db.prepare(`
-      UPDATE countries SET current_bid_cents = ?, company_name = ?, company_url = ?, logo_key = ?,
+      UPDATE countries SET current_bid_cents = ?, company_name = ?, company_url = ?, business_description = ?, project_category = ?, colorful_border = ?, logo_key = ?,
         owner_user_id = ?, active_since = ?, minimum_guaranteed_until = ?, version = version + 1,
         pending_bid_id = NULL, pending_bid_cents = NULL, pending_bid_expires_at = NULL, updated_at = ?
       WHERE code = ? AND pending_bid_id = ?
-    `).bind(order.amount_cents, order.company_name, order.company_url, order.logo_key, order.user_id, completedAt, completedAt + 60 * 60_000, completedAt, order.country_code, orderId),
+    `).bind(order.amount_cents, order.company_name, order.company_url, order.business_description, order.project_category, order.colorful_border, order.logo_key, order.user_id, completedAt, completedAt + 60 * 60_000, completedAt, order.country_code, orderId),
     db.prepare(`INSERT OR IGNORE INTO webhook_events (id, event_type, processed_at) VALUES (?, ?, ?)`).bind(event.id, event.type, completedAt),
   ]);
   if (Number(results[0].meta.changes ?? 0) !== 1 || Number(results[1].meta.changes ?? 0) !== 1) throw new Error('Could not finalize the accepted bid.');

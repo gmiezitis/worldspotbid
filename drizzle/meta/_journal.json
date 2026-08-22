@@ -15,6 +15,48 @@
       "when": 1787395714169,
       "tag": "0001_loose_stick",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787398111599,
+      "tag": "0002_perfect_screwball",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787398576144,
+      "tag": "0003_cynical_justin_hammer",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787399179424,
+      "tag": "0004_sparkling_magneto",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787421180268,
+      "tag": "0005_flippant_quicksilver",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1787423682085,
+      "tag": "0006_large_gateway",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1787423694960,
+      "tag": "0007_exotic_maria_hill",
+      "breakpoints": true
     }
   ]
 }

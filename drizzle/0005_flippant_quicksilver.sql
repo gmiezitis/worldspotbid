@@ -1,0 +1,1 @@
+ALTER TABLE `bid_orders` ADD `charity_cause` text(32);
