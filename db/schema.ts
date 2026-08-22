@@ -33,6 +33,7 @@ export const bidOrders = sqliteTable('bid_orders', {
   companyUrl: text('company_url', { length: 500 }).notNull(),
   businessDescription: text('business_description', { length: 180 }),
   projectCategory: text('project_category', { length: 60 }),
+  charityCause: text('charity_cause', { length: 32 }),
   logoKey: text('logo_key', { length: 160 }).notNull(),
   status: text('status', { length: 32 }).notNull(),
   failureReason: text('failure_reason', { length: 160 }),
