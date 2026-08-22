@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const db = getD1();
     const { results } = await db.prepare(`
-      SELECT code, name, current_bid_cents, company_name, company_url, business_description, project_category, logo_key,
+      SELECT code, name, current_bid_cents, company_name, company_url, business_description, project_category, colorful_border, logo_key,
              active_since, minimum_guaranteed_until
       FROM countries
       WHERE current_bid_cents > 0
@@ -23,6 +23,7 @@ export async function GET() {
       companyUrl: row.company_url,
       businessDescription: row.business_description,
       projectCategory: row.project_category,
+      colorfulBorder: Boolean(row.colorful_border),
       logoUrl: row.logo_key ? `/api/logo?key=${encodeURIComponent(String(row.logo_key))}` : null,
       activeSince: row.active_since,
       minimumGuaranteedUntil: row.minimum_guaranteed_until,
