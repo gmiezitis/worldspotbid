@@ -76,6 +76,7 @@ function visitorId() {
 }
 
 export function WorldMarketplace() {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [mapData, setMapData] = useState<WorldMapData | null>(null);
   const [spots, setSpots] = useState<CountrySpot[]>(previewSpots);
   const [selected, setSelected] = useState<CountrySpot>(previewSpots[0]);
@@ -105,6 +106,15 @@ export function WorldMarketplace() {
     if (!normalizedQuery) return new Set(locations.map((location) => location.id));
     return new Set(locations.filter((location) => location.name.toLowerCase().includes(normalizedQuery)).map((location) => location.id));
   }, [mapData, query]);
+
+  useEffect(() => {
+    let stored: string | null = null;
+    try { stored = window.localStorage.getItem('worldspot-theme'); } catch { /* use the system preference */ }
+    const initial = stored === 'dark' || stored === 'light' ? stored : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = initial;
+    const timer = window.setTimeout(() => setTheme(initial), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     void import('@svg-maps/world').then(({ default: map }) => {
@@ -181,6 +191,14 @@ export function WorldMarketplace() {
       body: JSON.stringify({ countryCode: code, visitorId: visitorId() }),
       keepalive: true,
     }).then((response) => { if (response.ok) void loadActivity(); }).catch(() => undefined);
+  };
+  const toggleTheme = () => {
+    setTheme((current) => {
+      const next = current === 'light' ? 'dark' : 'light';
+      document.documentElement.dataset.theme = next;
+      try { window.localStorage.setItem('worldspot-theme', next); } catch { /* theme remains active for this visit */ }
+      return next;
+    });
   };
   const nextBid = selected.currentBid === 0 ? 100 : selected.currentBid + 100;
 
@@ -268,7 +286,7 @@ export function WorldMarketplace() {
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Worldspot home"><span className="brand-mark">W</span><span>WORLDSPOT</span></a>
         <nav className="nav-links" aria-label="Main navigation"><a href="#market">Market</a><a href="#how-it-works">How it works</a><a href="#rules">Rules</a></nav>
-        <a className="account-button" href="/signin-with-chatgpt?return_to=%2F">Sign in</a>
+        <div className="account-actions"><button className="theme-button" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`} aria-pressed={theme === 'dark'}><span aria-hidden="true">{theme === 'light' ? '☾' : '☀'}</span><span>{theme === 'light' ? 'Dark' : 'Light'}</span></button><a className="account-button" href="/signin-with-chatgpt?return_to=%2F">Sign in</a></div>
       </header>
 
       {notice && <div className="notice" role="status"><span>{notice}</span><button type="button" onClick={() => setNotice('')} aria-label="Dismiss">×</button></div>}
