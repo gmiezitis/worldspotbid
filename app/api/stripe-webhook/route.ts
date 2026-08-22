@@ -14,6 +14,7 @@ type OrderRow = {
   expected_version: number;
   company_name: string;
   company_url: string;
+  business_description: string | null;
   project_category: string | null;
   logo_key: string;
   status: string;
@@ -88,11 +89,11 @@ async function acceptBid(event: Stripe.Event, session: Stripe.Checkout.Session) 
       WHERE id = ? AND EXISTS (SELECT 1 FROM countries WHERE code = ? AND pending_bid_id = ?)
     `).bind(completedAt, completedAt, orderId, order.country_code, orderId),
     db.prepare(`
-      UPDATE countries SET current_bid_cents = ?, company_name = ?, company_url = ?, project_category = ?, logo_key = ?,
+      UPDATE countries SET current_bid_cents = ?, company_name = ?, company_url = ?, business_description = ?, project_category = ?, logo_key = ?,
         owner_user_id = ?, active_since = ?, minimum_guaranteed_until = ?, version = version + 1,
         pending_bid_id = NULL, pending_bid_cents = NULL, pending_bid_expires_at = NULL, updated_at = ?
       WHERE code = ? AND pending_bid_id = ?
-    `).bind(order.amount_cents, order.company_name, order.company_url, order.project_category, order.logo_key, order.user_id, completedAt, completedAt + 60 * 60_000, completedAt, order.country_code, orderId),
+    `).bind(order.amount_cents, order.company_name, order.company_url, order.business_description, order.project_category, order.logo_key, order.user_id, completedAt, completedAt + 60 * 60_000, completedAt, order.country_code, orderId),
     db.prepare(`INSERT OR IGNORE INTO webhook_events (id, event_type, processed_at) VALUES (?, ?, ?)`).bind(event.id, event.type, completedAt),
   ]);
   if (Number(results[0].meta.changes ?? 0) !== 1 || Number(results[1].meta.changes ?? 0) !== 1) throw new Error('Could not finalize the accepted bid.');
