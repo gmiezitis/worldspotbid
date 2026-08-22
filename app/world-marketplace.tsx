@@ -12,6 +12,7 @@ type CountrySpot = {
   currentBid: number;
   companyName?: string;
   companyUrl?: string;
+  businessDescription?: string;
   projectCategory?: string;
   logoUrl?: string;
   minimumGuaranteedUntil?: number;
@@ -21,13 +22,13 @@ type TrendingCountry = { code: string; name: string; clicks24h: number; totalCli
 type LatestActivity = { code: string; countryName: string; amount: number; companyName: string; projectCategory?: string; completedAt: number };
 
 const previewSpots: CountrySpot[] = [
-  { code: 'us', name: 'United States', flag: '🇺🇸', currentBid: 4200, companyName: 'NORTHSTAR' },
-  { code: 'gb', name: 'United Kingdom', flag: '🇬🇧', currentBid: 3100, companyName: 'MONO' },
-  { code: 'jp', name: 'Japan', flag: '🇯🇵', currentBid: 2700, companyName: 'SORA' },
-  { code: 'de', name: 'Germany', flag: '🇩🇪', currentBid: 1900, companyName: 'KERN' },
-  { code: 'br', name: 'Brazil', flag: '🇧🇷', currentBid: 1600, companyName: 'VERDE' },
-  { code: 'fr', name: 'France', flag: '🇫🇷', currentBid: 1200, companyName: 'AVENIR' },
-  { code: 'lv', name: 'Latvia', flag: '🇱🇻', currentBid: 500, companyName: 'RIGA' },
+  { code: 'us', name: 'United States', flag: '🇺🇸', currentBid: 4200, companyName: 'NORTHSTAR', businessDescription: 'AI tools for ambitious global teams.' },
+  { code: 'gb', name: 'United Kingdom', flag: '🇬🇧', currentBid: 3100, companyName: 'MONO', businessDescription: 'Simple financial planning for founders.' },
+  { code: 'jp', name: 'Japan', flag: '🇯🇵', currentBid: 2700, companyName: 'SORA', businessDescription: 'Creative software for modern studios.' },
+  { code: 'de', name: 'Germany', flag: '🇩🇪', currentBid: 1900, companyName: 'KERN', businessDescription: 'Industrial design and engineering.' },
+  { code: 'br', name: 'Brazil', flag: '🇧🇷', currentBid: 1600, companyName: 'VERDE', businessDescription: 'Sustainable commerce for local brands.' },
+  { code: 'fr', name: 'France', flag: '🇫🇷', currentBid: 1200, companyName: 'AVENIR', businessDescription: 'Independent fashion and culture.' },
+  { code: 'lv', name: 'Latvia', flag: '🇱🇻', currentBid: 500, companyName: 'RIGA', businessDescription: 'Digital products built in the Baltics.' },
 ];
 
 const palette = ['#f4bd42', '#e9704e', '#ec6680', '#8b79d9', '#62ad76', '#568bd6', '#9e3943'];
@@ -45,6 +46,19 @@ function availableSpot(code: string, name: string): CountrySpot {
 function brandInitials(name?: string) {
   if (!name) return '—';
   return name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function descriptionLines(description?: string) {
+  const words = (description ?? '').trim().split(/\s+/).filter(Boolean);
+  const lines = ['', ''];
+  let line = 0;
+  for (const word of words) {
+    const candidate = `${lines[line]} ${word}`.trim();
+    if (candidate.length <= 28) lines[line] = candidate;
+    else if (line === 0) { line = 1; lines[1] = word.slice(0, 28); }
+    else break;
+  }
+  return lines;
 }
 
 function timeLabel(until?: number) {
@@ -86,6 +100,7 @@ export function WorldMarketplace() {
   const [bidOpen, setBidOpen] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [companyUrl, setCompanyUrl] = useState('https://');
+  const [businessDescription, setBusinessDescription] = useState('');
   const [projectCategory, setProjectCategory] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -257,18 +272,21 @@ export function WorldMarketplace() {
   const submitBid = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError('');
-    if (!logoFile) { setFormError('Choose your company logo.'); return; }
     setSubmitting(true);
     try {
-      const logoBody = new FormData();
-      logoBody.append('logo', logoFile);
-      const logoResponse = await fetch('/api/logo', { method: 'POST', body: logoBody });
-      const logo = await logoResponse.json() as { key?: string; error?: string };
-      if (!logoResponse.ok || !logo.key) throw new Error(logo.error ?? 'Could not upload the logo.');
+      let logoKey = '';
+      if (logoFile) {
+        const logoBody = new FormData();
+        logoBody.append('logo', logoFile);
+        const logoResponse = await fetch('/api/logo', { method: 'POST', body: logoBody });
+        const logo = await logoResponse.json() as { key?: string; error?: string };
+        if (!logoResponse.ok || !logo.key) throw new Error(logo.error ?? 'Could not upload the logo.');
+        logoKey = logo.key;
+      }
       const checkoutResponse = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ countryCode: selected.code, companyName, companyUrl, projectCategory, logoKey: logo.key }),
+        body: JSON.stringify({ countryCode: selected.code, companyName, companyUrl, businessDescription, projectCategory, logoKey }),
       });
       const checkout = await checkoutResponse.json() as { url?: string; error?: string };
       if (!checkoutResponse.ok || !checkout.url) throw new Error(checkout.error ?? 'Could not start checkout.');
@@ -308,13 +326,16 @@ export function WorldMarketplace() {
               <div className="map-stage" style={{ width: `${mapZoom * 100}%`, height: `${mapZoom * 100}%` }}>
             {mapData ? <svg viewBox={mapData.viewBox} role="img" aria-labelledby="world-map-title">
               <title id="world-map-title">Interactive map of advertising spots by country</title>
-              <defs>{spots.filter((spot) => spot.logoUrl).map((spot) => <pattern key={spot.code} id={`logo-${spot.code}`} width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill="#fff" /><image href={spot.logoUrl} width="1" height="1" preserveAspectRatio="xMidYMid slice" /></pattern>)}</defs>
+              <defs>{spots.map((spot, index) => {
+                if (spot.logoUrl) return <pattern key={spot.code} id={`logo-${spot.code}`} width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill="#fff" /><image href={spot.logoUrl} width="1" height="1" preserveAspectRatio="xMidYMid slice" /></pattern>;
+                const lines = descriptionLines(spot.businessDescription);
+                return <pattern key={spot.code} id={`brand-${spot.code}`} width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill={palette[index % palette.length]} /><text x=".5" y=".4" textAnchor="middle" fill="#17231f" fontSize=".1" fontWeight="900">{spot.companyName?.slice(0, 18)}</text><text x=".5" y=".54" textAnchor="middle" fill="#263a33" fontSize=".055" fontWeight="700">{lines[0]}</text><text x=".5" y=".63" textAnchor="middle" fill="#263a33" fontSize=".055" fontWeight="700">{lines[1]}</text></pattern>;
+              })}</defs>
               {mapData.locations.map((location) => {
                 const spot = spotMap.get(location.id);
                 const isSelected = selected.code === location.id;
                 const hiddenBySearch = query.length > 0 && !matchingCodes.has(location.id);
-                const index = spot ? spots.indexOf(spot) : -1;
-                const fill = spot?.logoUrl ? `url(#logo-${spot.code})` : spot ? palette[index % palette.length] : undefined;
+                const fill = spot?.logoUrl ? `url(#logo-${spot.code})` : spot ? `url(#brand-${spot.code})` : undefined;
                 return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={fill ? { fill } : undefined} role="button" tabIndex={0} aria-label={`${location.name}, ${spot ? `${money.format(spot.currentBid)} current value` : 'available from $100'}`} onClick={() => { if (!mapDragRef.current.moved) selectCountry(location.id, location.name); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name); } }} />;
               })}
             </svg> : <div className="map-loading" role="status">Loading the world map…</div>}
@@ -331,7 +352,7 @@ export function WorldMarketplace() {
           </div>
 
           <div className="selection-bar" aria-live="polite">
-            <div className="selected-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><small>Selected country</small><strong>{selected.name}</strong>{selected.companyUrl && <a href={selected.companyUrl} target="_blank" rel="noopener noreferrer">{selected.companyName} ↗</a>}</div></div>
+            <div className="selected-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><small>Selected country</small><strong>{selected.name}</strong>{selected.companyUrl && <a href={selected.companyUrl} target="_blank" rel="noopener noreferrer">{selected.companyName} ↗</a>}{selected.businessDescription && <p className="selected-description">{selected.businessDescription}</p>}</div></div>
             <div className="selection-stat"><small>Current value</small><strong>{selected.currentBid ? money.format(selected.currentBid) : 'Available'}</strong></div>
             <div className="selection-stat"><small>Next bid</small><strong>{money.format(nextBid)}</strong></div>
             <div className="selection-stat"><small>Country clicks</small><strong>{(clickCounts[selected.code] ?? 0).toLocaleString()}</strong></div>
@@ -382,8 +403,9 @@ export function WorldMarketplace() {
           {!paymentsEnabled && liveData ? <div className="setup-message"><strong>Secure checkout is not live yet.</strong><p>The marketplace is ready for Stripe test keys before accepting any payment.</p></div> : <form onSubmit={submitBid}>
             <label>Company name<input required minLength={2} maxLength={60} value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Acme Studio" /></label>
             <label>Company website<input required type="url" value={companyUrl} onChange={(event) => setCompanyUrl(event.target.value)} placeholder="https://example.com" /></label>
+            <label>About the business<textarea required minLength={10} maxLength={180} value={businessDescription} onChange={(event) => setBusinessDescription(event.target.value)} placeholder="Describe what your business does in one short sentence." /></label>
             <label>Project category<select required value={projectCategory} onChange={(event) => setProjectCategory(event.target.value)}><option value="" disabled>Choose a category</option>{PROJECT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
-            <label>Company logo <small>PNG, JPG, or WebP · max 750 KB</small><input required type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)} /></label>
+            <label>Company logo <small>Optional · PNG, JPG, or WebP · max 750 KB</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)} /></label>
             {formError && <p className="form-error" role="alert">{formError}</p>}
             <button className="checkout-button" disabled={submitting} type="submit">{submitting ? 'Preparing secure checkout…' : `Continue to Stripe · ${money.format(nextBid)}`}</button>
           </form>}
