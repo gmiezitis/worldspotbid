@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { getD1 } from '../../../db';
+import { BID_INCREMENT_CENTS } from '../../../lib/bidding';
 import { ApiError, jsonError } from '../../../lib/security';
 import { getStripe, getWebhookSecret } from '../../../lib/stripe';
 
@@ -54,7 +55,7 @@ async function acceptBid(event: Stripe.Event, session: Stripe.Checkout.Session) 
     SET pending_bid_id = ?, pending_bid_cents = ?, pending_bid_expires_at = ?, updated_at = ?
     WHERE code = ? AND version = ? AND current_bid_cents = ?
       AND (pending_bid_id IS NULL OR pending_bid_id = ? OR pending_bid_expires_at < ?)
-  `).bind(orderId, order.amount_cents, now + 10 * 60_000, now, order.country_code, order.expected_version, order.amount_cents - 10_000, orderId, now).run();
+  `).bind(orderId, order.amount_cents, now + 10 * 60_000, now, order.country_code, order.expected_version, order.amount_cents - BID_INCREMENT_CENTS, orderId, now).run();
 
   if (Number(acquired.meta.changes ?? 0) !== 1) {
     await cancelAuthorization(paymentIntentId);
