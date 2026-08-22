@@ -10,7 +10,7 @@ export async function GET() {
     const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
     const monthEnd = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
     const result = await getD1().prepare(`
-      SELECT charity_cause, COUNT(*) AS votes, COALESCE(SUM(amount_cents), 0) AS gross_cents
+      SELECT charity_cause, COUNT(*) AS votes, COALESCE(SUM(amount_cents + border_addon_cents), 0) AS gross_cents
       FROM bid_orders
       WHERE status = 'accepted' AND completed_at >= ? AND completed_at < ? AND charity_cause IS NOT NULL
       GROUP BY charity_cause
