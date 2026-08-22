@@ -117,8 +117,9 @@ footer p:last-child { text-align: right; }
 .bid-modal form { display: grid; gap: 15px; }
 .bid-modal form label { display: grid; gap: 7px; color: #47534e; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
 .bid-modal form label > small { color: #8b938f; font-size: 8px; font-weight: 700; text-transform: none; letter-spacing: 0; }
-.bid-modal input { width: 100%; height: 46px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; outline: 0; color: var(--ink); background: white; font-size: 12px; }
-.bid-modal input:focus { border-color: #6f8279; box-shadow: 0 0 0 3px rgba(36,75,64,.08); }
+.bid-modal input, .bid-modal select { width: 100%; height: 46px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; outline: 0; color: var(--ink); background: white; font-size: 12px; }
+.bid-modal select { appearance: auto; cursor: pointer; }
+.bid-modal input:focus, .bid-modal select:focus { border-color: #6f8279; box-shadow: 0 0 0 3px rgba(36,75,64,.08); }
 .bid-modal input[type='file'] { padding: 10px; height: auto; color: #6f7974; }
 .bid-modal input[type='file']::file-selector-button { margin-right: 10px; padding: 7px 9px; border: 0; border-radius: 6px; color: var(--ink); background: #e9ece4; cursor: pointer; font-size: 10px; font-weight: 800; }
 .checkout-button { min-height: 52px; margin-top: 3px; border: 0; border-radius: 10px; color: var(--lime); background: var(--ink); cursor: pointer; font-size: 12px; font-weight: 800; }
