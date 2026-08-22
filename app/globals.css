@@ -31,30 +31,46 @@ a { color: inherit; text-decoration: none; }
 .intro-copy { padding-bottom: 8px; }
 .intro-copy p { margin: 0 0 32px; color: #57625d; line-height: 1.7; font-size: 15px; }
 .intro-copy a { display: inline-flex; gap: 14px; align-items: center; border-bottom: 1px solid var(--ink); padding-bottom: 7px; font-size: 13px; font-weight: 800; }
-.charity-card { width: min(1440px, calc(100% - 64px)); margin: 0 auto 76px; display: grid; grid-template-columns: .78fr 1.22fr; overflow: hidden; border-radius: 28px; color: white; background: var(--green); box-shadow: 0 20px 60px rgba(23,35,31,.12); scroll-margin-top: 24px; }
-.charity-pledge { padding: 44px; background: linear-gradient(145deg, rgba(216,255,104,.16), transparent 55%); }
+.activity-ticker { width: min(1440px, calc(100% - 64px)); height: 56px; margin: 0 auto 28px; display: flex; overflow: hidden; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--card); }
+.ticker-label { position: relative; z-index: 2; flex: 0 0 auto; padding: 0 20px; display: flex; align-items: center; gap: 9px; border-right: 1px solid var(--line); color: var(--ink); background: var(--card); font-size: 9px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.ticker-label i { width: 7px; height: 7px; border-radius: 50%; background: #e9704e; box-shadow: 0 0 0 4px #f6ddd5; }
+.ticker-window { min-width: 0; flex: 1; overflow: hidden; }
+.ticker-track { width: max-content; min-width: 100%; height: 100%; display: flex; animation: ticker-scroll 34s linear infinite; }
+.ticker-window:hover .ticker-track, .ticker-window:focus-within .ticker-track { animation-play-state: paused; }
+.ticker-group { height: 100%; display: flex; align-items: center; flex-shrink: 0; }
+.ticker-group button { height: 100%; padding: 0 24px; display: flex; align-items: center; gap: 9px; border: 0; border-right: 1px solid var(--line); color: var(--ink); background: transparent; cursor: pointer; white-space: nowrap; }
+.ticker-group button:hover strong { color: var(--green); }
+.ticker-group button > span:first-child { font-size: 18px; }
+.ticker-group button strong { font-size: 10px; transition: color .15s ease; }
+.ticker-group button > span:nth-of-type(2) { color: var(--muted); font-size: 10px; }
+.ticker-group button small { color: #909894; font-size: 8px; }
+.ticker-empty { min-width: 680px; padding: 0 36px; display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+.ticker-empty b { color: var(--ink); }
+@keyframes ticker-scroll { to { transform: translateX(-50%); } }
+.charity-card { width: min(1180px, calc(100% - 64px)); margin: 0 auto 70px; display: grid; grid-template-columns: .72fr 1.28fr; overflow: hidden; border: 1px solid rgba(23,35,31,.08); border-radius: 20px; color: white; background: var(--green); box-shadow: 0 14px 42px rgba(23,35,31,.1); scroll-margin-top: 24px; }
+.charity-pledge { padding: 26px; background: linear-gradient(145deg, rgba(216,255,104,.16), transparent 55%); }
 .charity-pledge .section-kicker { color: #a9bdb4; }
-.charity-percent { display: block; color: var(--lime); font-size: clamp(72px, 8vw, 128px); font-weight: 500; letter-spacing: -.08em; line-height: .82; }
-.charity-pledge h2 { max-width: 520px; margin: 24px 0 18px; font-size: clamp(28px, 3vw, 44px); font-weight: 500; letter-spacing: -.05em; line-height: 1.05; }
-.charity-pledge > p:not(.section-kicker) { max-width: 510px; margin: 0; color: #c0cec8; font-size: 12px; line-height: 1.75; }
-.charity-total { margin-top: 30px; padding-top: 22px; display: flex; align-items: center; gap: 14px; border-top: 1px solid rgba(255,255,255,.12); }
-.charity-total span { color: var(--lime); font-size: 25px; font-weight: 800; }
+.charity-percent { display: block; color: var(--lime); font-size: clamp(54px, 6vw, 78px); font-weight: 500; letter-spacing: -.08em; line-height: .82; }
+.charity-pledge h2 { max-width: 420px; margin: 15px 0 10px; font-size: clamp(20px, 2.2vw, 28px); font-weight: 500; letter-spacing: -.05em; line-height: 1.05; }
+.charity-pledge > p:not(.section-kicker) { max-width: 450px; margin: 0; color: #c0cec8; font-size: 10px; line-height: 1.55; }
+.charity-total { margin-top: 16px; padding-top: 14px; display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,.12); }
+.charity-total span { color: var(--lime); font-size: 19px; font-weight: 800; }
 .charity-total small { max-width: 230px; color: #aebfb7; font-size: 9px; line-height: 1.45; }
-.charity-vote { padding: 44px; color: var(--ink); background: var(--card); }
-.charity-vote-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+.charity-vote { padding: 26px; color: var(--ink); background: var(--card); }
+.charity-vote-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
 .charity-vote-heading .section-kicker { margin-bottom: 7px; }
-.charity-vote-heading h3 { margin: 0; font-size: 25px; letter-spacing: -.04em; }
+.charity-vote-heading h3 { margin: 0; font-size: 19px; letter-spacing: -.04em; }
 .charity-vote-heading > span { color: var(--muted); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-.cause-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.cause-grid button { min-width: 0; padding: 16px; display: grid; grid-template-columns: 34px minmax(0,1fr) auto; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: transparent; cursor: pointer; text-align: left; }
+.cause-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cause-grid button { min-width: 0; padding: 10px; display: grid; grid-template-columns: 28px minmax(0,1fr) auto; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: transparent; cursor: pointer; text-align: left; }
 .cause-grid button:hover, .cause-grid .cause-selected { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
 .cause-grid .cause-selected { background: color-mix(in srgb, var(--lime) 18%, var(--card)); }
-.cause-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--lime); background: var(--ink); font-size: 15px; }
+.cause-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--lime); background: var(--ink); font-size: 13px; }
 .cause-grid button > span:nth-child(2) { display: flex; flex-direction: column; min-width: 0; }
 .cause-grid strong { font-size: 11px; }
-.cause-grid small { margin-top: 4px; color: var(--muted); font-size: 8px; line-height: 1.35; }
+.charity-card .cause-grid small { display: none; }
 .cause-grid em { color: var(--muted); font-size: 11px; font-style: normal; font-weight: 800; }
-.charity-disclosure { margin: 20px 0 0; color: var(--muted); font-size: 8px; line-height: 1.55; }
+.charity-disclosure { margin: 12px 0 0; color: var(--muted); font-size: 7px; line-height: 1.45; }
 .market { width: min(1600px, calc(100% - 32px)); margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); background: var(--green); border-radius: 28px; overflow: hidden; box-shadow: 0 25px 70px rgba(23,35,31,.12); }
 .map-panel { min-width: 0; padding: 34px; background: var(--card); border-radius: 28px; }
 .panel-heading, .leaderboard-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
@@ -267,14 +283,17 @@ html[data-theme='dark'] .notice button { color: #17231f; }
   .selection-bar .primary-button { grid-column: 1 / -1; }
 }
 @media (max-width: 720px) {
-  .topbar, .intro, .charity-card, .market-pulse, .how-it-works, footer { width: calc(100% - 32px); }
+  .topbar, .intro, .activity-ticker, .charity-card, .market-pulse, .how-it-works, footer { width: calc(100% - 32px); }
   .topbar { height: 70px; grid-template-columns: 1fr auto; }
   .nav-links { display: none; }
   .intro { padding: 48px 0 40px; grid-template-columns: 1fr; gap: 32px; }
   .intro h1 { font-size: clamp(50px, 17vw, 76px); }
-  .charity-card { margin-bottom: 52px; grid-template-columns: 1fr; border-radius: 20px; }
-  .charity-pledge, .charity-vote { padding: 28px 20px; }
-  .cause-grid { grid-template-columns: 1fr; }
+  .activity-ticker { height: 50px; margin-bottom: 18px; }
+  .ticker-label { padding: 0 12px; }
+  .ticker-group button { padding: 0 16px; }
+  .charity-card { margin-bottom: 44px; grid-template-columns: 1fr; border-radius: 18px; }
+  .charity-pledge, .charity-vote { padding: 22px 18px; }
+  .charity-card .cause-grid { grid-template-columns: 1fr 1fr; }
   .theme-button { width: 38px; padding: 0; justify-content: center; }
   .theme-button span:last-child { display: none; }
   .intro-copy { max-width: 420px; }
@@ -304,4 +323,4 @@ html[data-theme='dark'] .notice button { color: #17231f; }
   .modal-backdrop { padding: 10px; align-items: end; }
   .bid-modal { padding: 27px 20px 22px; border-radius: 20px 20px 12px 12px; }
 }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition-duration: .01ms !important; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition-duration: .01ms !important; } .ticker-track { animation: none; } .ticker-window { overflow-x: auto; } }
