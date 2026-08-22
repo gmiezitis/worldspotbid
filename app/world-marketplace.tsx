@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BID_INCREMENT_DOLLARS } from '../lib/bidding';
 import { PROJECT_CATEGORIES } from '../lib/categories';
 
 type WorldMapData = { viewBox: string; locations: Array<{ id: string; name: string; path: string }> };
@@ -219,7 +220,7 @@ export function WorldMarketplace() {
       return next;
     });
   };
-  const nextBid = selected.currentBid === 0 ? 100 : selected.currentBid + 100;
+  const nextBid = selected.currentBid + BID_INCREMENT_DOLLARS;
 
   const setMapZoom = useCallback((nextZoom: number, focus?: { clientX: number; clientY: number }) => {
     const viewport = mapViewportRef.current;
@@ -419,7 +420,7 @@ export function WorldMarketplace() {
 
       <section className="how-it-works" id="how-it-works">
         <p className="section-kicker">A simpler global billboard</p><h2>One clear rule.<br />The highest bid stays.</h2>
-        <div className="steps"><article><span>01</span><h3>Pick your market</h3><p>Select any country on the map. Empty spots begin at $100.</p></article><article><span>02</span><h3>Bid securely</h3><p>Every new bid is exactly $100 higher and is authorized through Stripe.</p></article><article><span>03</span><h3>Own the spotlight</h3><p>Your brand appears for at least one hour, then stays until it is outbid.</p></article></div>
+        <div className="steps"><article><span>01</span><h3>Pick your market</h3><p>Select any country on the map. Empty spots begin at $50.</p></article><article><span>02</span><h3>Bid securely</h3><p>Every new bid is exactly $50 higher and is authorized through Stripe.</p></article><article><span>03</span><h3>Own the spotlight</h3><p>Your brand appears for at least one hour, then stays until it is outbid.</p></article></div>
       </section>
 
       <footer id="rules"><div className="brand"><span className="brand-mark">W</span><span>WORLDSPOT</span></div><p>Advertising placement marketplace. Country spots do not represent ownership of land or territory.</p><p>© 2026 Worldspot</p></footer>
