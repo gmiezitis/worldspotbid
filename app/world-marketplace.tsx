@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BID_INCREMENT_DOLLARS } from '../lib/bidding';
+import { BID_INCREMENT_DOLLARS, COLOR_BORDER_ADDON_DOLLARS } from '../lib/bidding';
 import { PROJECT_CATEGORIES } from '../lib/categories';
 import { CHARITY_CAUSES, CHARITY_SHARE_PERCENT, type CharityCause } from '../lib/charity';
 import { DEMO_NORTHSTAR_LOGO } from '../lib/demo-logo';
@@ -17,6 +17,7 @@ type CountrySpot = {
   companyUrl?: string;
   businessDescription?: string;
   projectCategory?: string;
+  colorfulBorder?: boolean;
   logoUrl?: string;
   minimumGuaranteedUntil?: number;
   isDemo?: boolean;
@@ -24,10 +25,11 @@ type CountrySpot = {
 
 type TrendingCountry = { code: string; name: string; clicks24h: number; totalClicks: number };
 type LatestActivity = { code: string; countryName: string; amount: number; companyName: string; projectCategory?: string; completedAt: number };
+type CountryOwner = { companyName: string; amount: number; completedAt: number };
 type CharityStats = { monthLabel: string; totalVotes: number; totalPledgedCents: number; causes: Array<{ id: CharityCause; votes: number; pledgedCents: number }> };
 
 const previewSpots: CountrySpot[] = [
-  { code: 'us', name: 'United States', flag: '🇺🇸', currentBid: 0, companyName: 'NORTHSTAR', businessDescription: 'AI tools for ambitious global teams.', logoUrl: DEMO_NORTHSTAR_LOGO, isDemo: true },
+  { code: 'us', name: 'United States', flag: '🇺🇸', currentBid: 0, companyName: 'NORTHSTAR', businessDescription: 'AI tools for ambitious global teams.', colorfulBorder: true, logoUrl: DEMO_NORTHSTAR_LOGO, isDemo: true },
   { code: 'gb', name: 'United Kingdom', flag: '🇬🇧', currentBid: 0, companyName: 'MONO', businessDescription: 'Simple financial planning for founders.', isDemo: true },
   { code: 'jp', name: 'Japan', flag: '🇯🇵', currentBid: 0, companyName: 'SORA', businessDescription: 'Creative software for modern studios.', isDemo: true },
   { code: 'de', name: 'Germany', flag: '🇩🇪', currentBid: 0, companyName: 'KERN', businessDescription: 'Industrial design and engineering.', isDemo: true },
@@ -35,6 +37,17 @@ const previewSpots: CountrySpot[] = [
   { code: 'fr', name: 'France', flag: '🇫🇷', currentBid: 0, companyName: 'AVENIR', businessDescription: 'Independent fashion and culture.', isDemo: true },
   { code: 'lv', name: 'Latvia', flag: '🇱🇻', currentBid: 0, companyName: 'RIGA', businessDescription: 'Digital products built in the Baltics.', isDemo: true },
 ];
+
+const PREVIEW_HISTORY_NOW = Date.UTC(2026, 7, 22, 18);
+const previewOwnerHistory: Record<string, CountryOwner[]> = {
+  us: [
+    { companyName: 'NORTHSTAR', amount: 250, completedAt: PREVIEW_HISTORY_NOW - 45 * 60_000 },
+    { companyName: 'Bright Labs', amount: 200, completedAt: PREVIEW_HISTORY_NOW - 7 * 60 * 60_000 },
+    { companyName: 'Atlas Works', amount: 150, completedAt: PREVIEW_HISTORY_NOW - 24 * 60 * 60_000 },
+    { companyName: 'Field Notes', amount: 100, completedAt: PREVIEW_HISTORY_NOW - 3 * 24 * 60 * 60_000 },
+    { companyName: 'First Light', amount: 50, completedAt: PREVIEW_HISTORY_NOW - 5 * 24 * 60 * 60_000 },
+  ],
+};
 
 const palette = ['#f4bd42', '#e9704e', '#ec6680', '#8b79d9', '#62ad76', '#568bd6', '#9e3943'];
 const MAX_MAP_ZOOM = 6;
@@ -110,6 +123,7 @@ export function WorldMarketplace() {
   const [businessDescription, setBusinessDescription] = useState('');
   const [projectCategory, setProjectCategory] = useState('');
   const [charityCause, setCharityCause] = useState<CharityCause>('children');
+  const [colorfulBorder, setColorfulBorder] = useState(false);
   const [charityStats, setCharityStats] = useState<CharityStats | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -120,6 +134,8 @@ export function WorldMarketplace() {
   const [trending, setTrending] = useState<TrendingCountry[]>([]);
   const [latestActivity, setLatestActivity] = useState<LatestActivity[]>([]);
   const [clickCounts, setClickCounts] = useState<Record<string, number>>({});
+  const [ownerHistory, setOwnerHistory] = useState<Record<string, CountryOwner[]>>(previewOwnerHistory);
+  const [historyLoadingCode, setHistoryLoadingCode] = useState<string | null>(null);
   const mapViewportRef = useRef<HTMLDivElement>(null);
   const mapZoomRef = useRef(1);
   const wheelZoomFrameRef = useRef<number | null>(null);
@@ -184,6 +200,21 @@ export function WorldMarketplace() {
     } catch { /* charity totals remain unavailable until the next refresh */ }
   }, []);
 
+  const loadCountryHistory = useCallback(async (code: string, usePreview = false) => {
+    if (usePreview && previewOwnerHistory[code]) {
+      setOwnerHistory((current) => ({ ...current, [code]: previewOwnerHistory[code] }));
+      return;
+    }
+    setHistoryLoadingCode(code);
+    try {
+      const response = await fetch(`/api/country-history?country=${encodeURIComponent(code)}`, { cache: 'no-store' });
+      if (!response.ok) return;
+      const data = await response.json() as { owners?: CountryOwner[] };
+      setOwnerHistory((current) => ({ ...current, [code]: data.owners ?? [] }));
+    } catch { /* history remains unavailable until the country is selected again */ }
+    finally { setHistoryLoadingCode((current) => current === code ? null : current); }
+  }, []);
+
   useEffect(() => {
     const initial = window.setTimeout(() => void loadMarket(), 0);
     const timer = window.setInterval(() => void loadMarket(), 15_000);
@@ -226,8 +257,10 @@ export function WorldMarketplace() {
   }, [loadMarket]);
 
   const selectCountry = (code: string, name: string, showBidCard = false) => {
-    setSelected(spotMap.get(code) ?? availableSpot(code, name));
+    const nextSpot = spotMap.get(code) ?? availableSpot(code, name);
+    setSelected(nextSpot);
     if (showBidCard) setMapBidCardOpen(true);
+    void loadCountryHistory(code, Boolean(nextSpot.isDemo));
     setClickCounts((current) => ({ ...current, [code]: (current[code] ?? 0) + 1 }));
     void fetch('/api/activity', {
       method: 'POST',
@@ -245,6 +278,8 @@ export function WorldMarketplace() {
     });
   };
   const nextBid = selected.currentBid + BID_INCREMENT_DOLLARS;
+  const checkoutTotal = nextBid + (colorfulBorder ? COLOR_BORDER_ADDON_DOLLARS : 0);
+  const selectedHistory = ownerHistory[selected.code] ?? [];
 
   const setMapZoom = useCallback((nextZoom: number, focus?: { clientX: number; clientY: number }) => {
     const viewport = mapViewportRef.current;
@@ -342,7 +377,7 @@ export function WorldMarketplace() {
       const checkoutResponse = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ countryCode: selected.code, companyName, companyUrl, businessDescription, projectCategory, charityCause, logoKey }),
+        body: JSON.stringify({ countryCode: selected.code, companyName, companyUrl, businessDescription, projectCategory, charityCause, colorfulBorder, logoKey }),
       });
       const checkout = await checkoutResponse.json() as { url?: string; error?: string };
       if (!checkoutResponse.ok || !checkout.url) throw new Error(checkout.error ?? 'Could not start checkout.');
@@ -401,7 +436,7 @@ export function WorldMarketplace() {
               <div className="map-stage" style={{ width: `${mapZoom * 100}%`, height: `${mapZoom * 100}%` }}>
             {mapData ? <svg viewBox={mapData.viewBox} role="img" aria-labelledby="world-map-title">
               <title id="world-map-title">Interactive map of advertising spots by country</title>
-              <defs>{spots.map((spot, index) => {
+              <defs><linearGradient id="colorful-border" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ff5d7d" /><stop offset=".28" stopColor="#ffbf47" /><stop offset=".52" stopColor="#d8ff68" /><stop offset=".76" stopColor="#58b8ff" /><stop offset="1" stopColor="#a878ff" /></linearGradient>{spots.map((spot, index) => {
                 if (spot.logoUrl) return <pattern key={spot.code} id={`logo-${spot.code}`} width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill="#fff" /><image href={spot.logoUrl} width="1" height="1" preserveAspectRatio="xMidYMid slice" /></pattern>;
                 const lines = descriptionLines(spot.businessDescription);
                 return <pattern key={spot.code} id={`brand-${spot.code}`} width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill={palette[index % palette.length]} /><text x=".5" y=".4" textAnchor="middle" fill="#17231f" fontSize=".1" fontWeight="900">{spot.companyName?.slice(0, 18)}</text><text x=".5" y=".54" textAnchor="middle" fill="#263a33" fontSize=".055" fontWeight="700">{lines[0]}</text><text x=".5" y=".63" textAnchor="middle" fill="#263a33" fontSize=".055" fontWeight="700">{lines[1]}</text></pattern>;
@@ -411,7 +446,7 @@ export function WorldMarketplace() {
                 const isSelected = selected.code === location.id;
                 const hiddenBySearch = query.length > 0 && !matchingCodes.has(location.id);
                 const fill = spot?.logoUrl ? `url(#logo-${spot.code})` : spot ? `url(#brand-${spot.code})` : undefined;
-                return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={fill ? { fill } : undefined} role="button" tabIndex={0} aria-label={`${location.name}, ${spot?.isDemo ? 'available from $50 with a demo brand preview' : spot ? `${money.format(spot.currentBid)} current value` : 'available from $50'}`} onClick={() => { if (!mapDragRef.current.moved) selectCountry(location.id, location.name, true); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name, true); } }} />;
+                return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${spot?.colorfulBorder ? 'country-colorful-border' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={{ ...(fill ? { fill } : {}), ...(spot?.colorfulBorder ? { stroke: 'url(#colorful-border)' } : {}) }} role="button" tabIndex={0} aria-label={`${location.name}, ${spot?.isDemo ? 'available from $50 with a demo brand preview' : spot ? `${money.format(spot.currentBid)} current value` : 'available from $50'}`} onClick={() => { if (!mapDragRef.current.moved) selectCountry(location.id, location.name, true); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name, true); } }} />;
               })}
             </svg> : <div className="map-loading" role="status">Loading the world map…</div>}
               </div>
@@ -425,7 +460,9 @@ export function WorldMarketplace() {
             {mapBidCardOpen && <aside className="map-bid-card" aria-label={`Bid on ${selected.name}`} onPointerDown={(event) => event.stopPropagation()}>
               <button className="map-card-close" type="button" onClick={() => setMapBidCardOpen(false)} aria-label="Close selected country">×</button>
               <div className="map-card-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><small>Selected country</small><strong>{selected.name}</strong>{selected.companyName && <span className="map-card-brand">{selected.companyName}{selected.isDemo ? ' · Demo preview' : ''}</span>}</div></div>
+              {selected.companyName ? <div className="map-card-company"><small>Current company</small><strong>{selected.companyName}</strong><p>{selected.businessDescription ?? 'No company description was provided.'}</p></div> : <div className="map-card-company map-card-available"><small>Current company</small><strong>This country is available</strong><p>Be the first brand to claim this spot.</p></div>}
               <div className="map-card-values"><span><small>Current value</small><strong>{selected.currentBid ? money.format(selected.currentBid) : 'Available'}</strong></span><span><small>Your bid</small><strong>{money.format(nextBid)}</strong></span></div>
+              <div className="map-card-history"><div className="map-card-history-title"><strong>Last 5 owners</strong>{selected.isDemo && <small>Example history</small>}</div>{historyLoadingCode === selected.code ? <p className="history-empty">Loading owner history…</p> : selectedHistory.length ? <ol>{selectedHistory.slice(0, 5).map((owner, index) => <li key={`${owner.companyName}-${owner.completedAt}-${index}`}><span><b>{owner.companyName}</b><small>{activityTime(owner.completedAt)}</small></span><strong>{money.format(owner.amount)}</strong></li>)}</ol> : <p className="history-empty">No previous owners yet.</p>}</div>
               <button className="primary-button" type="button" onClick={() => { setFormError(''); setBidOpen(true); }}>Claim {selected.name} · {money.format(nextBid)}</button>
             </aside>}
             <div className="map-legend" aria-hidden="true"><span><i className="legend-available" /> Available</span><span><i className="legend-owned" /> Brand live</span></div>
@@ -466,16 +503,17 @@ export function WorldMarketplace() {
         <section className="bid-modal" role="dialog" aria-modal="true" aria-labelledby="bid-title">
           <button className="modal-close" type="button" onClick={() => setBidOpen(false)} disabled={submitting} aria-label="Close">×</button>
           <div className="modal-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><p className="section-kicker">Exclusive country spot</p><h2 id="bid-title">Claim {selected.name}</h2></div></div>
-          <div className="bid-summary"><span><small>Your bid</small><strong>{money.format(nextBid)}</strong></span><span><small>Guaranteed</small><strong>At least 1 hour</strong></span></div>
+          <div className="bid-summary"><span><small>Country bid</small><strong>{money.format(nextBid)}</strong></span><span><small>Color border</small><strong>{colorfulBorder ? `+${money.format(COLOR_BORDER_ADDON_DOLLARS)}` : 'Not added'}</strong></span><span><small>Total</small><strong>{money.format(checkoutTotal)}</strong></span></div>
           {!paymentsEnabled && liveData ? <div className="setup-message"><strong>Secure checkout is not live yet.</strong><p>The marketplace is ready for Stripe test keys before accepting any payment.</p></div> : <form onSubmit={submitBid}>
             <label>Company name<input required minLength={2} maxLength={60} value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Acme Studio" /></label>
             <label>Company website<input required type="url" value={companyUrl} onChange={(event) => setCompanyUrl(event.target.value)} placeholder="https://example.com" /></label>
             <label>About the business<textarea required minLength={10} maxLength={180} value={businessDescription} onChange={(event) => setBusinessDescription(event.target.value)} placeholder="Describe what your business does in one short sentence." /></label>
             <label>Project category<select required value={projectCategory} onChange={(event) => setProjectCategory(event.target.value)}><option value="" disabled>Choose a category</option>{PROJECT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+            <label className={`border-addon ${colorfulBorder ? 'border-addon-selected' : ''}`}><input type="checkbox" checked={colorfulBorder} onChange={(event) => setColorfulBorder(event.target.checked)} /><span className="border-addon-swatch" aria-hidden="true" /><span><strong>Add a colorful country border</strong><small>Makes your active country easier to notice on the map.</small></span><b>+{money.format(COLOR_BORDER_ADDON_DOLLARS)}</b></label>
             <fieldset className="charity-field"><legend>Choose the cause your purchase supports</legend><div>{CHARITY_CAUSES.map((cause) => <label key={cause.id} className={charityCause === cause.id ? 'charity-choice-selected' : ''}><input type="radio" name="charityCause" value={cause.id} checked={charityCause === cause.id} onChange={() => setCharityCause(cause.id)} /><span>{cause.icon}</span><strong>{cause.label}</strong></label>)}</div><small>{CHARITY_SHARE_PERCENT}% of an accepted bid is pledged by Worldspot to the monthly winning cause.</small></fieldset>
             <label>Company logo <small>Optional · PNG, JPG, or WebP · max 750 KB</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)} /></label>
             {formError && <p className="form-error" role="alert">{formError}</p>}
-            <button className="checkout-button" disabled={submitting} type="submit">{submitting ? 'Preparing secure checkout…' : `Continue to Stripe · ${money.format(nextBid)}`}</button>
+            <button className="checkout-button" disabled={submitting} type="submit">{submitting ? 'Preparing secure checkout…' : `Continue to Stripe · ${money.format(checkoutTotal)}`}</button>
           </form>}
           <p className="bid-terms">This is an advertising placement, not land ownership or a tax-deductible donation. Your card is captured only if this bid is accepted. If another completed checkout wins first, the authorization is cancelled.</p>
         </section>
