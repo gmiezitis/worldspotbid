@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type WorldMapData = { viewBox: string; locations: Array<{ id: string; name: string; path: string }> };
 
@@ -62,6 +62,10 @@ export function WorldMarketplace() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
+  const [mapZoom, setMapZoomState] = useState(1);
+  const [mapDragging, setMapDragging] = useState(false);
+  const mapViewportRef = useRef<HTMLDivElement>(null);
+  const mapDragRef = useRef({ pointerId: -1, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0, moved: false });
 
   const spotMap = useMemo(() => new Map(spots.map((spot) => [spot.code, spot])), [spots]);
   const matchingCodes = useMemo(() => {
@@ -123,6 +127,46 @@ export function WorldMarketplace() {
   const selectCountry = (code: string, name: string) => setSelected(spotMap.get(code) ?? availableSpot(code, name));
   const nextBid = selected.currentBid === 0 ? 100 : selected.currentBid + 100;
 
+  const setMapZoom = (nextZoom: number) => {
+    const viewport = mapViewportRef.current;
+    const next = Math.min(3, Math.max(1, nextZoom));
+    const centerX = viewport ? (viewport.scrollLeft + viewport.clientWidth / 2) / Math.max(viewport.scrollWidth, 1) : 0.5;
+    const centerY = viewport ? (viewport.scrollTop + viewport.clientHeight / 2) / Math.max(viewport.scrollHeight, 1) : 0.5;
+    setMapZoomState(next);
+    window.requestAnimationFrame(() => {
+      const current = mapViewportRef.current;
+      if (!current) return;
+      current.scrollLeft = centerX * current.scrollWidth - current.clientWidth / 2;
+      current.scrollTop = centerY * current.scrollHeight - current.clientHeight / 2;
+    });
+  };
+
+  const startMapDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    const viewport = mapViewportRef.current;
+    if (!viewport) return;
+    mapDragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop, moved: false };
+    viewport.setPointerCapture(event.pointerId);
+    setMapDragging(true);
+  };
+
+  const moveMap = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const viewport = mapViewportRef.current;
+    const drag = mapDragRef.current;
+    if (!viewport || drag.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (Math.abs(deltaX) + Math.abs(deltaY) > 5) drag.moved = true;
+    viewport.scrollLeft = drag.scrollLeft - deltaX;
+    viewport.scrollTop = drag.scrollTop - deltaY;
+  };
+
+  const stopMapDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (mapDragRef.current.pointerId !== event.pointerId) return;
+    mapDragRef.current.pointerId = -1;
+    setMapDragging(false);
+  };
+
   const submitBid = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError('');
@@ -173,6 +217,8 @@ export function WorldMarketplace() {
           </div>
 
           <div className="map-wrap">
+            <div className={`map-viewport ${mapDragging ? 'map-dragging' : ''}`} ref={mapViewportRef} onPointerDown={startMapDrag} onPointerMove={moveMap} onPointerUp={stopMapDrag} onPointerCancel={stopMapDrag}>
+              <div className="map-stage" style={{ width: `${mapZoom * 100}%`, height: `${mapZoom * 100}%` }}>
             {mapData ? <svg viewBox={mapData.viewBox} role="img" aria-labelledby="world-map-title">
               <title id="world-map-title">Interactive map of advertising spots by country</title>
               <defs>{spots.filter((spot) => spot.logoUrl).map((spot) => <pattern key={spot.code} id={`logo-${spot.code}`} width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill="#fff" /><image href={spot.logoUrl} width="1" height="1" preserveAspectRatio="xMidYMid slice" /></pattern>)}</defs>
@@ -182,9 +228,17 @@ export function WorldMarketplace() {
                 const hiddenBySearch = query.length > 0 && !matchingCodes.has(location.id);
                 const index = spot ? spots.indexOf(spot) : -1;
                 const fill = spot?.logoUrl ? `url(#logo-${spot.code})` : spot ? palette[index % palette.length] : undefined;
-                return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={fill ? { fill } : undefined} role="button" tabIndex={0} aria-label={`${location.name}, ${spot ? `${money.format(spot.currentBid)} current value` : 'available from $100'}`} onClick={() => selectCountry(location.id, location.name)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name); } }} />;
+                return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={fill ? { fill } : undefined} role="button" tabIndex={0} aria-label={`${location.name}, ${spot ? `${money.format(spot.currentBid)} current value` : 'available from $100'}`} onClick={() => { if (!mapDragRef.current.moved) selectCountry(location.id, location.name); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name); } }} />;
               })}
             </svg> : <div className="map-loading" role="status">Loading the world map…</div>}
+              </div>
+            </div>
+            <div className="map-controls" aria-label="Map zoom controls" onPointerDown={(event) => event.stopPropagation()}>
+              <button type="button" onClick={() => setMapZoom(mapZoom - 0.5)} disabled={mapZoom <= 1} aria-label="Zoom out">−</button>
+              <span aria-live="polite">{Math.round(mapZoom * 100)}%</span>
+              <button type="button" onClick={() => setMapZoom(mapZoom + 0.5)} disabled={mapZoom >= 3} aria-label="Zoom in">+</button>
+              {mapZoom > 1 && <button className="map-reset" type="button" onClick={() => setMapZoom(1)}>Reset</button>}
+            </div>
             <div className="map-legend" aria-hidden="true"><span><i className="legend-available" /> Available</span><span><i className="legend-owned" /> Brand live</span></div>
             <p className="map-credit">Map © SVG Maps, CC BY 4.0</p>
           </div>
