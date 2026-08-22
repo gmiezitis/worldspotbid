@@ -121,6 +121,8 @@ a { color: inherit; text-decoration: none; }
 .history-empty { margin: 0; padding: 11px 0 3px; color: var(--muted); font-size: 9px; }
 .map-bid-card .primary-button { width: 100%; }
 .map-loading { color: #7c8982; font-size: 11px; font-weight: 700; }
+.map-load-error { display: grid; justify-items: center; gap: 10px; }
+.map-load-error button { border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); padding: 8px 14px; font: inherit; cursor: pointer; }
 .country { --spot-color: #b9c6bc; fill: #b8c7bc; stroke: #e9eee7; stroke-width: .8; cursor: grab; outline: none; transition: fill .16s ease, opacity .16s ease, filter .16s ease; }
 .map-viewport.map-dragging .country { cursor: grabbing; }
 .country:hover, .country:focus-visible { fill: #829b8c; filter: brightness(.97); }

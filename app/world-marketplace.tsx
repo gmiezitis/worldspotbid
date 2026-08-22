@@ -111,6 +111,8 @@ function visitorId() {
 export function WorldMarketplace() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [mapData, setMapData] = useState<WorldMapData | null>(null);
+  const [mapLoadError, setMapLoadError] = useState(false);
+  const [mapLoadAttempt, setMapLoadAttempt] = useState(0);
   const [spots, setSpots] = useState<CountrySpot[]>(previewSpots);
   const [selected, setSelected] = useState<CountrySpot>(previewSpots[0]);
   const [query, setQuery] = useState('');
@@ -161,10 +163,25 @@ export function WorldMarketplace() {
   }, []);
 
   useEffect(() => {
-    void import('@svg-maps/world').then(({ default: map }) => {
-      setMapData({ ...map, locations: map.locations.filter((location: WorldMapData['locations'][number]) => /^[a-z]{2}$/.test(location.id)) });
-    });
-  }, []);
+    const controller = new AbortController();
+
+    const loadMap = async () => {
+      try {
+        const manifestResponse = await fetch('/map/index.json', { signal: controller.signal });
+        if (!manifestResponse.ok) throw new Error('Map manifest unavailable');
+        const manifest = await manifestResponse.json() as { viewBox: string; chunks: string[] };
+        const chunkResponses = await Promise.all(manifest.chunks.map((chunk) => fetch(`/map/${chunk}`, { signal: controller.signal })));
+        if (chunkResponses.some((response) => !response.ok)) throw new Error('Map chunk unavailable');
+        const chunks = await Promise.all(chunkResponses.map((response) => response.json() as Promise<WorldMapData['locations']>));
+        setMapData({ viewBox: manifest.viewBox, locations: chunks.flat().filter((location) => /^[a-z]{2}$/.test(location.id)) });
+      } catch {
+        if (!controller.signal.aborted) setMapLoadError(true);
+      }
+    };
+
+    void loadMap();
+    return () => controller.abort();
+  }, [mapLoadAttempt]);
 
   const loadMarket = useCallback(async () => {
     try {
@@ -448,7 +465,7 @@ export function WorldMarketplace() {
                 const fill = spot?.logoUrl ? `url(#logo-${spot.code})` : spot ? `url(#brand-${spot.code})` : undefined;
                 return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${spot?.colorfulBorder ? 'country-colorful-border' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={{ ...(fill ? { fill } : {}), ...(spot?.colorfulBorder ? { stroke: 'url(#colorful-border)' } : {}) }} role="button" tabIndex={0} aria-label={`${location.name}, ${spot?.isDemo ? 'available from $50 with a demo brand preview' : spot ? `${money.format(spot.currentBid)} current value` : 'available from $50'}`} onClick={() => { if (!mapDragRef.current.moved) selectCountry(location.id, location.name, true); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name, true); } }} />;
               })}
-            </svg> : <div className="map-loading" role="status">Loading the world map…</div>}
+            </svg> : mapLoadError ? <div className="map-loading map-load-error" role="alert"><span>The world map could not load.</span><button type="button" onClick={() => { setMapLoadError(false); setMapLoadAttempt((attempt) => attempt + 1); }}>Try again</button></div> : <div className="map-loading" role="status">Loading the world map…</div>}
               </div>
             </div>
             <div className="map-controls" aria-label="Map zoom controls" onPointerDown={(event) => event.stopPropagation()}>
