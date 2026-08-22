@@ -4,6 +4,7 @@ import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, u
 import { BID_INCREMENT_DOLLARS } from '../lib/bidding';
 import { PROJECT_CATEGORIES } from '../lib/categories';
 import { CHARITY_CAUSES, CHARITY_SHARE_PERCENT, type CharityCause } from '../lib/charity';
+import { DEMO_NORTHSTAR_LOGO } from '../lib/demo-logo';
 
 type WorldMapData = { viewBox: string; locations: Array<{ id: string; name: string; path: string }> };
 
@@ -26,7 +27,7 @@ type LatestActivity = { code: string; countryName: string; amount: number; compa
 type CharityStats = { monthLabel: string; totalVotes: number; totalPledgedCents: number; causes: Array<{ id: CharityCause; votes: number; pledgedCents: number }> };
 
 const previewSpots: CountrySpot[] = [
-  { code: 'us', name: 'United States', flag: '🇺🇸', currentBid: 0, companyName: 'NORTHSTAR', businessDescription: 'AI tools for ambitious global teams.', logoUrl: '/demo-northstar.png', isDemo: true },
+  { code: 'us', name: 'United States', flag: '🇺🇸', currentBid: 0, companyName: 'NORTHSTAR', businessDescription: 'AI tools for ambitious global teams.', logoUrl: DEMO_NORTHSTAR_LOGO, isDemo: true },
   { code: 'gb', name: 'United Kingdom', flag: '🇬🇧', currentBid: 0, companyName: 'MONO', businessDescription: 'Simple financial planning for founders.', isDemo: true },
   { code: 'jp', name: 'Japan', flag: '🇯🇵', currentBid: 0, companyName: 'SORA', businessDescription: 'Creative software for modern studios.', isDemo: true },
   { code: 'de', name: 'Germany', flag: '🇩🇪', currentBid: 0, companyName: 'KERN', businessDescription: 'Industrial design and engineering.', isDemo: true },
