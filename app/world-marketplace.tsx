@@ -3,6 +3,7 @@
 import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BID_INCREMENT_DOLLARS } from '../lib/bidding';
 import { PROJECT_CATEGORIES } from '../lib/categories';
+import { CHARITY_CAUSES, CHARITY_SHARE_PERCENT, type CharityCause } from '../lib/charity';
 
 type WorldMapData = { viewBox: string; locations: Array<{ id: string; name: string; path: string }> };
 
@@ -21,6 +22,7 @@ type CountrySpot = {
 
 type TrendingCountry = { code: string; name: string; clicks24h: number; totalClicks: number };
 type LatestActivity = { code: string; countryName: string; amount: number; companyName: string; projectCategory?: string; completedAt: number };
+type CharityStats = { monthLabel: string; totalVotes: number; totalPledgedCents: number; causes: Array<{ id: CharityCause; votes: number; pledgedCents: number }> };
 
 const previewSpots: CountrySpot[] = [
   { code: 'us', name: 'United States', flag: '🇺🇸', currentBid: 4200, companyName: 'NORTHSTAR', businessDescription: 'AI tools for ambitious global teams.' },
@@ -104,6 +106,8 @@ export function WorldMarketplace() {
   const [companyUrl, setCompanyUrl] = useState('https://');
   const [businessDescription, setBusinessDescription] = useState('');
   const [projectCategory, setProjectCategory] = useState('');
+  const [charityCause, setCharityCause] = useState<CharityCause>('children');
+  const [charityStats, setCharityStats] = useState<CharityStats | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -168,6 +172,14 @@ export function WorldMarketplace() {
     } catch { /* activity remains empty until the next refresh */ }
   }, []);
 
+  const loadCharity = useCallback(async () => {
+    try {
+      const response = await fetch('/api/charity', { cache: 'no-store' });
+      if (!response.ok) return;
+      setCharityStats(await response.json() as CharityStats);
+    } catch { /* charity totals remain unavailable until the next refresh */ }
+  }, []);
+
   useEffect(() => {
     const initial = window.setTimeout(() => void loadMarket(), 0);
     const timer = window.setInterval(() => void loadMarket(), 15_000);
@@ -179,6 +191,12 @@ export function WorldMarketplace() {
     const timer = window.setInterval(() => void loadActivity(), 15_000);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); };
   }, [loadActivity]);
+
+  useEffect(() => {
+    const initial = window.setTimeout(() => void loadCharity(), 0);
+    const timer = window.setInterval(() => void loadCharity(), 30_000);
+    return () => { window.clearTimeout(initial); window.clearInterval(timer); };
+  }, [loadCharity]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -318,7 +336,7 @@ export function WorldMarketplace() {
       const checkoutResponse = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ countryCode: selected.code, companyName, companyUrl, businessDescription, projectCategory, logoKey }),
+        body: JSON.stringify({ countryCode: selected.code, companyName, companyUrl, businessDescription, projectCategory, charityCause, logoKey }),
       });
       const checkout = await checkoutResponse.json() as { url?: string; error?: string };
       if (!checkoutResponse.ok || !checkout.url) throw new Error(checkout.error ?? 'Could not start checkout.');
@@ -335,7 +353,7 @@ export function WorldMarketplace() {
     <main className="site-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Worldspot home"><span className="brand-mark">W</span><span>WORLDSPOT</span></a>
-        <nav className="nav-links" aria-label="Main navigation"><a href="#market">Market</a><a href="#leaderboard">Leaderboard</a><a href="#how-it-works">How it works</a><a href="#rules">Rules</a></nav>
+        <nav className="nav-links" aria-label="Main navigation"><a href="#market">Market</a><a href="#leaderboard">Leaderboard</a><a href="#charity">Charity</a><a href="#how-it-works">How it works</a><a href="#rules">Rules</a></nav>
         <div className="account-actions"><button className="theme-button" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`} aria-pressed={theme === 'dark'}><span aria-hidden="true">{theme === 'light' ? '☾' : '☀'}</span><span>{theme === 'light' ? 'Dark' : 'Light'}</span></button><a className="account-button" href="/signin-with-chatgpt?return_to=%2F">Sign in</a></div>
       </header>
 
@@ -344,6 +362,11 @@ export function WorldMarketplace() {
       <section className="intro" id="top">
         <div><p className="eyebrow"><span /> Global advertising, one country at a time</p><h1>Put your brand<br />on the world.</h1></div>
         <div className="intro-copy"><p>Choose a country, claim its spotlight, and stay visible until another brand raises the bid.</p><a href="#market">Explore the live map <span aria-hidden="true">↓</span></a></div>
+      </section>
+
+      <section className="charity-card" id="charity" aria-labelledby="charity-title">
+        <div className="charity-pledge"><p className="section-kicker">Worldspot gives back</p><strong className="charity-percent">{CHARITY_SHARE_PERCENT}%</strong><h2 id="charity-title">of every accepted bid is pledged to charity.</h2><p>Your advertising purchase casts one vote. At the end of each calendar month, the pledged amount will support a vetted nonprofit in the winning cause.</p><div className="charity-total"><span>{money.format((charityStats?.totalPledgedCents ?? 0) / 100)}</span><small>pledged from accepted bids in {charityStats?.monthLabel ?? 'the current month'}</small></div></div>
+        <div className="charity-vote"><div className="charity-vote-heading"><div><p className="section-kicker">Choose your cause</p><h3>What should your next bid support?</h3></div><span>{charityStats?.totalVotes ?? 0} purchase votes</span></div><div className="cause-grid">{CHARITY_CAUSES.map((cause) => { const stats = charityStats?.causes.find((item) => item.id === cause.id); return <button type="button" className={charityCause === cause.id ? 'cause-selected' : ''} key={cause.id} onClick={() => setCharityCause(cause.id)} aria-pressed={charityCause === cause.id}><span className="cause-icon" aria-hidden="true">{cause.icon}</span><span><strong>{cause.label}</strong><small>{cause.description}</small></span><em>{stats?.votes ?? 0}</em></button>; })}</div><p className="charity-disclosure">This is an advertising purchase, not a charitable donation by the buyer, and no tax deduction is promised. Charity partners and monthly proof of payment will be published before public payments launch.</p></div>
       </section>
 
       <section className="market-pulse" aria-labelledby="market-pulse-title">
@@ -443,11 +466,12 @@ export function WorldMarketplace() {
             <label>Company website<input required type="url" value={companyUrl} onChange={(event) => setCompanyUrl(event.target.value)} placeholder="https://example.com" /></label>
             <label>About the business<textarea required minLength={10} maxLength={180} value={businessDescription} onChange={(event) => setBusinessDescription(event.target.value)} placeholder="Describe what your business does in one short sentence." /></label>
             <label>Project category<select required value={projectCategory} onChange={(event) => setProjectCategory(event.target.value)}><option value="" disabled>Choose a category</option>{PROJECT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+            <fieldset className="charity-field"><legend>Choose the cause your purchase supports</legend><div>{CHARITY_CAUSES.map((cause) => <label key={cause.id} className={charityCause === cause.id ? 'charity-choice-selected' : ''}><input type="radio" name="charityCause" value={cause.id} checked={charityCause === cause.id} onChange={() => setCharityCause(cause.id)} /><span>{cause.icon}</span><strong>{cause.label}</strong></label>)}</div><small>{CHARITY_SHARE_PERCENT}% of an accepted bid is pledged by Worldspot to the monthly winning cause.</small></fieldset>
             <label>Company logo <small>Optional · PNG, JPG, or WebP · max 750 KB</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)} /></label>
             {formError && <p className="form-error" role="alert">{formError}</p>}
             <button className="checkout-button" disabled={submitting} type="submit">{submitting ? 'Preparing secure checkout…' : `Continue to Stripe · ${money.format(nextBid)}`}</button>
           </form>}
-          <p className="bid-terms">This is an advertising placement, not land ownership. Your card is captured only if this bid is accepted. If another completed checkout wins first, the authorization is cancelled.</p>
+          <p className="bid-terms">This is an advertising placement, not land ownership or a tax-deductible donation. Your card is captured only if this bid is accepted. If another completed checkout wins first, the authorization is cancelled.</p>
         </section>
       </div>}
     </main>
