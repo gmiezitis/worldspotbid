@@ -99,6 +99,7 @@ export function WorldMarketplace() {
   const [liveData, setLiveData] = useState(false);
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   const [bidOpen, setBidOpen] = useState(false);
+  const [mapBidCardOpen, setMapBidCardOpen] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [companyUrl, setCompanyUrl] = useState('https://');
   const [businessDescription, setBusinessDescription] = useState('');
@@ -202,8 +203,9 @@ export function WorldMarketplace() {
     void check();
   }, [loadMarket]);
 
-  const selectCountry = (code: string, name: string) => {
+  const selectCountry = (code: string, name: string, showBidCard = false) => {
     setSelected(spotMap.get(code) ?? availableSpot(code, name));
+    if (showBidCard) setMapBidCardOpen(true);
     setClickCounts((current) => ({ ...current, [code]: (current[code] ?? 0) + 1 }));
     void fetch('/api/activity', {
       method: 'POST',
@@ -380,7 +382,7 @@ export function WorldMarketplace() {
                 const isSelected = selected.code === location.id;
                 const hiddenBySearch = query.length > 0 && !matchingCodes.has(location.id);
                 const fill = spot?.logoUrl ? `url(#logo-${spot.code})` : spot ? `url(#brand-${spot.code})` : undefined;
-                return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={fill ? { fill } : undefined} role="button" tabIndex={0} aria-label={`${location.name}, ${spot ? `${money.format(spot.currentBid)} current value` : 'available from $100'}`} onClick={() => { if (!mapDragRef.current.moved) selectCountry(location.id, location.name); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name); } }} />;
+                return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={fill ? { fill } : undefined} role="button" tabIndex={0} aria-label={`${location.name}, ${spot ? `${money.format(spot.currentBid)} current value` : 'available from $50'}`} onClick={() => { if (!mapDragRef.current.moved) selectCountry(location.id, location.name, true); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name, true); } }} />;
               })}
             </svg> : <div className="map-loading" role="status">Loading the world map…</div>}
               </div>
@@ -391,6 +393,12 @@ export function WorldMarketplace() {
               <button type="button" onClick={() => setMapZoom(mapZoom + 0.5)} disabled={mapZoom >= 3} aria-label="Zoom in">+</button>
               {mapZoom > 1 && <button className="map-reset" type="button" onClick={() => setMapZoom(1)}>Reset</button>}
             </div>
+            {mapBidCardOpen && <aside className="map-bid-card" aria-label={`Bid on ${selected.name}`} onPointerDown={(event) => event.stopPropagation()}>
+              <button className="map-card-close" type="button" onClick={() => setMapBidCardOpen(false)} aria-label="Close selected country">×</button>
+              <div className="map-card-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><small>Selected country</small><strong>{selected.name}</strong></div></div>
+              <div className="map-card-values"><span><small>Current value</small><strong>{selected.currentBid ? money.format(selected.currentBid) : 'Available'}</strong></span><span><small>Your bid</small><strong>{money.format(nextBid)}</strong></span></div>
+              <button className="primary-button" type="button" onClick={() => { setFormError(''); setBidOpen(true); }}>Bid now · {money.format(nextBid)}</button>
+            </aside>}
             <div className="map-legend" aria-hidden="true"><span><i className="legend-available" /> Available</span><span><i className="legend-owned" /> Brand live</span></div>
             <p className="map-credit">Map © SVG Maps, CC BY 4.0</p>
           </div>
