@@ -21,11 +21,15 @@ export async function POST(request: Request) {
     const country = getCountry(body.countryCode);
     const companyName = cleanText(body.companyName, 'Company name', 2, 60);
     const companyUrl = cleanCompanyUrl(body.companyUrl);
+    const businessDescription = cleanText(body.businessDescription, 'Business description', 10, 180);
     if (!isProjectCategory(body.projectCategory)) throw new ApiError(400, 'Choose a valid project category.');
     const projectCategory = body.projectCategory;
-    const logoKey = cleanText(body.logoKey, 'Logo', 40, 160);
-    const logo = await env.FILES.head(logoKey);
-    if (!logo || logo.customMetadata?.ownerUserId !== user.userId) throw new ApiError(400, 'Upload your company logo again.');
+    let logoKey = '';
+    if (body.logoKey !== undefined && body.logoKey !== null && body.logoKey !== '') {
+      logoKey = cleanText(body.logoKey, 'Logo', 40, 160);
+      const logo = await env.FILES.head(logoKey);
+      if (!logo || logo.customMetadata?.ownerUserId !== user.userId) throw new ApiError(400, 'Upload your company logo again.');
+    }
 
     const db = getD1();
     const recent = await db.prepare(`SELECT COUNT(*) AS count FROM bid_orders WHERE user_id = ? AND created_at > ?`).bind(user.userId, now - 10 * 60_000).first<{ count: number }>();
@@ -40,9 +44,9 @@ export async function POST(request: Request) {
     await db.prepare(`
       INSERT INTO bid_orders (
         id, country_code, country_name, user_id, bidder_email, amount_cents,
-        expected_version, company_name, company_url, project_category, logo_key, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'creating_checkout', ?, ?)
-    `).bind(orderId, country.code, country.name, user.userId, user.email, amountCents, current.version, companyName, companyUrl, projectCategory, logoKey, now, now).run();
+        expected_version, company_name, company_url, business_description, project_category, logo_key, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'creating_checkout', ?, ?)
+    `).bind(orderId, country.code, country.name, user.userId, user.email, amountCents, current.version, companyName, companyUrl, businessDescription, projectCategory, logoKey, now, now).run();
 
     const origin = trustedAppOrigin(request);
     const session = await getStripe().checkout.sessions.create({
