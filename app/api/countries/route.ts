@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const db = getD1();
     const { results } = await db.prepare(`
-      SELECT code, name, current_bid_cents, company_name, company_url, project_category, logo_key,
+      SELECT code, name, current_bid_cents, company_name, company_url, business_description, project_category, logo_key,
              active_since, minimum_guaranteed_until
       FROM countries
       WHERE current_bid_cents > 0
@@ -21,6 +21,7 @@ export async function GET() {
       currentBid: Number(row.current_bid_cents) / 100,
       companyName: row.company_name,
       companyUrl: row.company_url,
+      businessDescription: row.business_description,
       projectCategory: row.project_category,
       logoUrl: row.logo_key ? `/api/logo?key=${encodeURIComponent(String(row.logo_key))}` : null,
       activeSince: row.active_since,
