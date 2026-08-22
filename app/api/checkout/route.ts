@@ -3,6 +3,7 @@ import { getChatGPTUser } from '../../chatgpt-auth';
 import { getD1 } from '../../../db';
 import { getCountry } from '../../../lib/countries';
 import { isProjectCategory } from '../../../lib/categories';
+import { BID_INCREMENT_CENTS } from '../../../lib/bidding';
 import { ApiError, assertSameOrigin, cleanCompanyUrl, cleanText, jsonError, readJsonObject } from '../../../lib/security';
 import { getStripe, trustedAppOrigin } from '../../../lib/stripe';
 
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
     await db.prepare(`INSERT OR IGNORE INTO countries (code, name, current_bid_cents, version, updated_at) VALUES (?, ?, 0, 0, ?)`).bind(country.code, country.name, now).run();
     const current = await db.prepare(`SELECT current_bid_cents, version FROM countries WHERE code = ?`).bind(country.code).first<CountryRow>();
     if (!current) throw new ApiError(500, 'Country record is unavailable.');
-    const amountCents = Number(current.current_bid_cents) + 10_000;
+    const amountCents = Number(current.current_bid_cents) + BID_INCREMENT_CENTS;
     orderId = crypto.randomUUID();
 
     await db.prepare(`
