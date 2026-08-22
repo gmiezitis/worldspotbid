@@ -37,6 +37,7 @@ const previewSpots: CountrySpot[] = [
 ];
 
 const palette = ['#f4bd42', '#e9704e', '#ec6680', '#8b79d9', '#62ad76', '#568bd6', '#9e3943'];
+const MAX_MAP_ZOOM = 6;
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
 function countryFlag(code: string) {
@@ -248,7 +249,7 @@ export function WorldMarketplace() {
   const setMapZoom = useCallback((nextZoom: number, focus?: { clientX: number; clientY: number }) => {
     const viewport = mapViewportRef.current;
     const currentZoom = mapZoomRef.current;
-    const next = Math.min(3, Math.max(1, nextZoom));
+    const next = Math.min(MAX_MAP_ZOOM, Math.max(1, nextZoom));
     if (!viewport || next === currentZoom) return;
 
     const bounds = viewport.getBoundingClientRect();
@@ -418,7 +419,7 @@ export function WorldMarketplace() {
             <div className="map-controls" aria-label="Map zoom controls" onPointerDown={(event) => event.stopPropagation()}>
               <button type="button" onClick={() => setMapZoom(mapZoom - 0.5)} disabled={mapZoom <= 1} aria-label="Zoom out">−</button>
               <span aria-live="polite">{Math.round(mapZoom * 100)}%</span>
-              <button type="button" onClick={() => setMapZoom(mapZoom + 0.5)} disabled={mapZoom >= 3} aria-label="Zoom in">+</button>
+              <button type="button" onClick={() => setMapZoom(mapZoom + 0.5)} disabled={mapZoom >= MAX_MAP_ZOOM} aria-label="Zoom in">+</button>
               {mapZoom > 1 && <button className="map-reset" type="button" onClick={() => setMapZoom(1)}>Reset</button>}
             </div>
             {mapBidCardOpen && <aside className="map-bid-card" aria-label={`Bid on ${selected.name}`} onPointerDown={(event) => event.stopPropagation()}>
