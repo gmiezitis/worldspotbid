@@ -17,6 +17,9 @@ type CountrySpot = {
   minimumGuaranteedUntil?: number;
 };
 
+type TrendingCountry = { code: string; name: string; clicks24h: number; totalClicks: number };
+type LatestActivity = { code: string; countryName: string; amount: number; companyName: string; projectCategory?: string; completedAt: number };
+
 const previewSpots: CountrySpot[] = [
   { code: 'us', name: 'United States', flag: '🇺🇸', currentBid: 4200, companyName: 'NORTHSTAR' },
   { code: 'gb', name: 'United Kingdom', flag: '🇬🇧', currentBid: 3100, companyName: 'MONO' },
@@ -50,6 +53,28 @@ function timeLabel(until?: number) {
   return minutes > 0 ? `${minutes} min guaranteed` : 'Visible until outbid';
 }
 
+function activityTime(timestamp: number) {
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function visitorId() {
+  const key = 'worldspot-visitor-id';
+  try {
+    const current = window.localStorage.getItem(key);
+    if (current && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(current)) return current;
+    const created = crypto.randomUUID();
+    window.localStorage.setItem(key, created);
+    return created;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
 export function WorldMarketplace() {
   const [mapData, setMapData] = useState<WorldMapData | null>(null);
   const [spots, setSpots] = useState<CountrySpot[]>(previewSpots);
@@ -67,6 +92,9 @@ export function WorldMarketplace() {
   const [notice, setNotice] = useState('');
   const [mapZoom, setMapZoomState] = useState(1);
   const [mapDragging, setMapDragging] = useState(false);
+  const [trending, setTrending] = useState<TrendingCountry[]>([]);
+  const [latestActivity, setLatestActivity] = useState<LatestActivity[]>([]);
+  const [clickCounts, setClickCounts] = useState<Record<string, number>>({});
   const mapViewportRef = useRef<HTMLDivElement>(null);
   const mapDragRef = useRef({ pointerId: -1, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0, moved: false });
 
@@ -98,11 +126,28 @@ export function WorldMarketplace() {
     } catch { /* retain the clearly labelled preview data */ }
   }, []);
 
+  const loadActivity = useCallback(async () => {
+    try {
+      const response = await fetch('/api/activity', { cache: 'no-store' });
+      if (!response.ok) return;
+      const data = await response.json() as { trending?: TrendingCountry[]; latestActivity?: LatestActivity[]; clickCounts?: Record<string, number> };
+      setTrending(data.trending ?? []);
+      setLatestActivity(data.latestActivity ?? []);
+      setClickCounts(data.clickCounts ?? {});
+    } catch { /* activity remains empty until the next refresh */ }
+  }, []);
+
   useEffect(() => {
     const initial = window.setTimeout(() => void loadMarket(), 0);
     const timer = window.setInterval(() => void loadMarket(), 15_000);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); };
   }, [loadMarket]);
+
+  useEffect(() => {
+    const initial = window.setTimeout(() => void loadActivity(), 0);
+    const timer = window.setInterval(() => void loadActivity(), 15_000);
+    return () => { window.clearTimeout(initial); window.clearInterval(timer); };
+  }, [loadActivity]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -127,7 +172,16 @@ export function WorldMarketplace() {
     void check();
   }, [loadMarket]);
 
-  const selectCountry = (code: string, name: string) => setSelected(spotMap.get(code) ?? availableSpot(code, name));
+  const selectCountry = (code: string, name: string) => {
+    setSelected(spotMap.get(code) ?? availableSpot(code, name));
+    setClickCounts((current) => ({ ...current, [code]: (current[code] ?? 0) + 1 }));
+    void fetch('/api/activity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ countryCode: code, visitorId: visitorId() }),
+      keepalive: true,
+    }).then((response) => { if (response.ok) void loadActivity(); }).catch(() => undefined);
+  };
   const nextBid = selected.currentBid === 0 ? 100 : selected.currentBid + 100;
 
   const setMapZoom = useCallback((nextZoom: number) => {
@@ -262,6 +316,7 @@ export function WorldMarketplace() {
             <div className="selected-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><small>Selected country</small><strong>{selected.name}</strong>{selected.companyUrl && <a href={selected.companyUrl} target="_blank" rel="noopener noreferrer">{selected.companyName} ↗</a>}</div></div>
             <div className="selection-stat"><small>Current value</small><strong>{selected.currentBid ? money.format(selected.currentBid) : 'Available'}</strong></div>
             <div className="selection-stat"><small>Next bid</small><strong>{money.format(nextBid)}</strong></div>
+            <div className="selection-stat"><small>Country clicks</small><strong>{(clickCounts[selected.code] ?? 0).toLocaleString()}</strong></div>
             <button className="primary-button" type="button" onClick={() => { setFormError(''); setBidOpen(true); }}>Claim {selected.name}</button>
           </div>
         </div>
@@ -278,6 +333,20 @@ export function WorldMarketplace() {
           ))}</div> : <div className="empty-leaderboard"><span>01</span><h3>Be first on the map</h3><p>Every country opens at $100.</p></div>}
           <div className="leaderboard-note"><span>{spots.length}</span><p><strong>{spots.length === 1 ? 'brand is' : 'brands are'} live</strong><br />across the map right now.</p></div>
         </aside>
+      </section>
+
+      <section className="market-pulse" aria-labelledby="market-pulse-title">
+        <div className="pulse-heading"><div><p className="section-kicker">Live attention</p><h2 id="market-pulse-title">Marketplace pulse</h2></div><p>Country clicks update continuously. Bid activity appears after a payment is securely accepted.</p></div>
+        <div className="pulse-grid">
+          <article className="pulse-card">
+            <div className="pulse-card-heading"><div><span className="pulse-dot" /> Trending now</div><small>Last 24 hours</small></div>
+            {trending.length ? <div className="trending-list">{trending.map((country, index) => <button type="button" key={country.code} onClick={() => selectCountry(country.code, country.name)}><span className="trend-rank">{String(index + 1).padStart(2, '0')}</span><span className="trend-flag">{countryFlag(country.code)}</span><span className="trend-country"><strong>{country.name}</strong><small>{country.totalClicks.toLocaleString()} total clicks</small></span><span className="trend-clicks">{country.clicks24h.toLocaleString()}<small>clicks</small></span></button>)}</div> : <div className="pulse-empty"><strong>No clicks yet</strong><span>Select a country to start the trend.</span></div>}
+          </article>
+          <article className="pulse-card">
+            <div className="pulse-card-heading"><div><span className="activity-mark">↗</span> Latest activity</div><small>Accepted bids</small></div>
+            {latestActivity.length ? <div className="activity-list">{latestActivity.map((activity, index) => <button type="button" key={`${activity.code}-${activity.completedAt}-${index}`} onClick={() => selectCountry(activity.code, activity.countryName)}><span className="trend-flag">{countryFlag(activity.code)}</span><span className="trend-country"><strong>{activity.companyName} claimed {activity.countryName}</strong><small>{activity.projectCategory ?? 'Brand placement'} · {activityTime(activity.completedAt)}</small></span><span className="activity-price">{money.format(activity.amount)}</span></button>)}</div> : <div className="pulse-empty"><strong>No accepted bids yet</strong><span>The newest successful claim will appear here.</span></div>}
+          </article>
+        </div>
       </section>
 
       <section className="how-it-works" id="how-it-works">
