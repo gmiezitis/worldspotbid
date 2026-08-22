@@ -217,19 +217,26 @@ export function WorldMarketplace() {
   };
   const nextBid = selected.currentBid === 0 ? 100 : selected.currentBid + 100;
 
-  const setMapZoom = useCallback((nextZoom: number) => {
+  const setMapZoom = useCallback((nextZoom: number, focus?: { clientX: number; clientY: number }) => {
     const viewport = mapViewportRef.current;
     const next = Math.min(3, Math.max(1, nextZoom));
-    const centerX = viewport ? (viewport.scrollLeft + viewport.clientWidth / 2) / Math.max(viewport.scrollWidth, 1) : 0.5;
-    const centerY = viewport ? (viewport.scrollTop + viewport.clientHeight / 2) / Math.max(viewport.scrollHeight, 1) : 0.5;
+    if (!viewport || next === mapZoom) return;
+
+    const bounds = viewport.getBoundingClientRect();
+    const offsetX = focus ? focus.clientX - bounds.left : viewport.clientWidth / 2;
+    const offsetY = focus ? focus.clientY - bounds.top : viewport.clientHeight / 2;
+    const contentX = viewport.scrollLeft + offsetX;
+    const contentY = viewport.scrollTop + offsetY;
+    const scale = next / mapZoom;
+
     setMapZoomState(next);
     window.requestAnimationFrame(() => {
       const current = mapViewportRef.current;
       if (!current) return;
-      current.scrollLeft = centerX * current.scrollWidth - current.clientWidth / 2;
-      current.scrollTop = centerY * current.scrollHeight - current.clientHeight / 2;
+      current.scrollLeft = contentX * scale - offsetX;
+      current.scrollTop = contentY * scale - offsetY;
     });
-  }, []);
+  }, [mapZoom]);
 
   useEffect(() => {
     const viewport = mapViewportRef.current;
@@ -237,7 +244,10 @@ export function WorldMarketplace() {
     const handleWheel = (event: WheelEvent) => {
       if (event.deltaY === 0) return;
       event.preventDefault();
-      setMapZoom(mapZoom + (event.deltaY < 0 ? 0.25 : -0.25));
+      setMapZoom(mapZoom + (event.deltaY < 0 ? 0.25 : -0.25), {
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
     };
     viewport.addEventListener('wheel', handleWheel, { passive: false });
     return () => viewport.removeEventListener('wheel', handleWheel);
