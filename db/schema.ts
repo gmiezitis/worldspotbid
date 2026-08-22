@@ -8,6 +8,7 @@ export const countries = sqliteTable('countries', {
   companyUrl: text('company_url', { length: 500 }),
   businessDescription: text('business_description', { length: 180 }),
   projectCategory: text('project_category', { length: 60 }),
+  colorfulBorder: integer('colorful_border', { mode: 'boolean' }).notNull().default(false),
   logoKey: text('logo_key', { length: 160 }),
   ownerUserId: text('owner_user_id', { length: 160 }),
   activeSince: integer('active_since', { mode: 'timestamp_ms' }),
@@ -34,6 +35,8 @@ export const bidOrders = sqliteTable('bid_orders', {
   businessDescription: text('business_description', { length: 180 }),
   projectCategory: text('project_category', { length: 60 }),
   charityCause: text('charity_cause', { length: 32 }),
+  colorfulBorder: integer('colorful_border', { mode: 'boolean' }).notNull().default(false),
+  borderAddonCents: integer('border_addon_cents').notNull().default(0),
   logoKey: text('logo_key', { length: 160 }).notNull(),
   status: text('status', { length: 32 }).notNull(),
   failureReason: text('failure_reason', { length: 160 }),
@@ -46,6 +49,7 @@ export const bidOrders = sqliteTable('bid_orders', {
   index('idx_bid_orders_user_created').on(table.userId, table.createdAt),
   index('idx_bid_orders_status').on(table.status),
   index('idx_bid_orders_status_completed').on(table.status, table.completedAt),
+  index('idx_bid_orders_country_status_completed').on(table.countryCode, table.status, table.completedAt),
 ]);
 
 export const webhookEvents = sqliteTable('webhook_events', {
