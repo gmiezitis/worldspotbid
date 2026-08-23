@@ -16,6 +16,10 @@ export function generateMetadata(): Metadata {
     metadataBase: new URL(origin),
     title,
     description,
+    icons: {
+      icon: [{ url: '/favicon.png', type: 'image/png', sizes: '64x64' }],
+      apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
+    },
     openGraph: { title, description, images: [{ url: image, width: 1200, height: 630, alt: 'Worldspot — Put your brand on the world' }] },
     twitter: { card: 'summary_large_image', title, description, images: [image] },
   };
