@@ -5,6 +5,7 @@ const express = require('express');
 const { Pool } = require('pg');
 const Stripe = require('stripe');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
@@ -72,6 +73,7 @@ app.use((request, response, next) => {
   return next();
 });
 
+app.post('/api/logos', express.raw({ type: ['image/png', 'image/jpeg', 'image/webp'], limit: '750kb' }), handleLogoUpload);
 app.use(express.json({ limit: '100kb' }));
 app.use(express.static(frontendDirectory, {
   index: false,
@@ -84,6 +86,23 @@ app.get('/', (_request, response) => {
 
 app.get('/api/status', (_request, response) => {
   response.json({ status: 'WorldSpotBid server is alive and running!' });
+});
+
+app.get('/api/logos/:id', async (request, response) => {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request.params.id)) {
+    return response.status(404).end();
+  }
+
+  try {
+    const result = await pool.query('SELECT content_type, image_data FROM brand_logos WHERE id = $1', [request.params.id]);
+    if (result.rowCount === 0) return response.status(404).end();
+    response.set('Content-Type', result.rows[0].content_type);
+    response.set('Cache-Control', 'public, max-age=31536000, immutable');
+    return response.send(result.rows[0].image_data);
+  } catch (error) {
+    console.error('Unable to load brand logo:', error.message);
+    return response.status(500).end();
+  }
 });
 
 app.get('/health/database', async (_request, response) => {
@@ -437,6 +456,46 @@ async function handleStripeWebhook(request, response) {
   }
 }
 
+async function handleLogoUpload(request, response) {
+  const requestOrigin = request.get('origin');
+  if (requestOrigin && requestOrigin !== publicAppOrigin) {
+    return response.status(403).json({ error: 'Request origin is not allowed.' });
+  }
+
+  const contentType = request.get('content-type')?.split(';')[0].toLowerCase();
+  if (!Buffer.isBuffer(request.body) || request.body.length === 0 || request.body.length > 750 * 1024) {
+    return response.status(400).json({ error: 'Logo must be a PNG, JPG, or WebP file under 750 KB.' });
+  }
+  if (!isValidLogoFile(request.body, contentType)) {
+    return response.status(400).json({ error: 'Logo file contents do not match a supported image type.' });
+  }
+
+  const id = crypto.randomUUID();
+  try {
+    await pool.query(`
+      INSERT INTO brand_logos (id, content_type, image_data)
+      VALUES ($1, $2, $3)
+    `, [id, contentType, request.body]);
+    return response.status(201).json({ logo_url: `${publicAppOrigin}/api/logos/${id}` });
+  } catch (error) {
+    console.error('Unable to save brand logo:', error.message);
+    return response.status(500).json({ error: 'Unable to save the logo.' });
+  }
+}
+
+function isValidLogoFile(buffer, contentType) {
+  if (contentType === 'image/png') {
+    return buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  }
+  if (contentType === 'image/jpeg') {
+    return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+  if (contentType === 'image/webp') {
+    return buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP';
+  }
+  return false;
+}
+
 async function acceptAuthorizedCheckout(session) {
   const bidId = Number.parseInt(session.metadata?.bidId, 10);
   const paymentIntentId = typeof session.payment_intent === 'string'
@@ -619,6 +678,15 @@ function normalizeUrl(value, fieldName, options = {}) {
 
 async function initializeDatabase() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS brand_logos (
+      id UUID PRIMARY KEY,
+      content_type VARCHAR(20) NOT NULL CHECK (content_type IN ('image/png', 'image/jpeg', 'image/webp')),
+      image_data BYTEA NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS countries (
       country_code VARCHAR(2) PRIMARY KEY,
       current_price INTEGER NOT NULL DEFAULT 50 CHECK (current_price >= 0),
@@ -708,6 +776,13 @@ async function initializeDatabase() {
     WHERE status IN ('creating_checkout', 'pending_checkout', 'capturing')
   `);
 }
+
+app.use((error, _request, response, next) => {
+  if (error?.type === 'entity.too.large') {
+    return response.status(413).json({ error: 'Logo must be under 750 KB.' });
+  }
+  return next(error);
+});
 
 let server;
 

@@ -1,6 +1,7 @@
 'use client';
+/* eslint-disable @next/next/no-img-element -- user-uploaded brand logos are served dynamically by the marketplace */
 
-import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BID_INCREMENT_DOLLARS, COLOR_BORDER_ADDON_DOLLARS } from '../lib/bidding';
 import { PROJECT_CATEGORIES } from '../lib/categories';
 import { CHARITY_SHARE_PERCENT } from '../lib/charity';
@@ -73,17 +74,9 @@ function brandInitials(name?: string) {
   return name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function descriptionLines(description?: string) {
-  const words = (description ?? '').trim().split(/\s+/).filter(Boolean);
-  const lines = ['', ''];
-  let line = 0;
-  for (const word of words) {
-    const candidate = `${lines[line]} ${word}`.trim();
-    if (candidate.length <= 28) lines[line] = candidate;
-    else if (line === 0) { line = 1; lines[1] = word.slice(0, 28); }
-    else break;
-  }
-  return lines;
+function countryColor(code: string) {
+  const value = code.split('').reduce((total, character) => total + character.charCodeAt(0), 0);
+  return palette[value % palette.length];
 }
 
 function timeLabel(until?: number) {
@@ -118,16 +111,18 @@ export function WorldMarketplace() {
   const [businessDescription, setBusinessDescription] = useState('');
   const [projectCategory, setProjectCategory] = useState('');
   const [colorfulBorder, setColorfulBorder] = useState(false);
-  const [, setLogoFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
   const [mapZoom, setMapZoomState] = useState(1);
   const [mapDragging, setMapDragging] = useState(false);
+  const [hoveredCountry, setHoveredCountry] = useState<{ spot?: CountrySpot; name: string; x: number; y: number } | null>(null);
   const [latestActivity, setLatestActivity] = useState<LatestActivity[]>([]);
   const [ownerHistory, setOwnerHistory] = useState<Record<string, CountryOwner[]>>(previewOwnerHistory);
   const [historyLoadingCode, setHistoryLoadingCode] = useState<string | null>(null);
   const mapViewportRef = useRef<HTMLDivElement>(null);
+  const mapWrapRef = useRef<HTMLDivElement>(null);
   const mapZoomRef = useRef(1);
   const wheelZoomFrameRef = useRef<number | null>(null);
   const wheelDeltaRef = useRef(0);
@@ -255,6 +250,17 @@ export function WorldMarketplace() {
     if (showBidCard) setMapBidCardOpen(true);
     void loadCountryHistory(code, Boolean(nextSpot.isDemo));
   };
+  const showCountryPreview = (event: ReactPointerEvent<SVGPathElement>, spot: CountrySpot | undefined, name: string) => {
+    if (event.pointerType === 'touch' || mapDragging) return;
+    const bounds = mapWrapRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    setHoveredCountry({
+      spot,
+      name,
+      x: Math.min(Math.max(14, bounds.width - 324), Math.max(14, event.clientX - bounds.left + 18)),
+      y: Math.min(Math.max(14, bounds.height - 174), Math.max(14, event.clientY - bounds.top + 18)),
+    });
+  };
   const toggleTheme = () => {
     setTheme((current) => {
       const next = current === 'light' ? 'dark' : 'light';
@@ -351,12 +357,23 @@ export function WorldMarketplace() {
     setFormError('');
     setSubmitting(true);
     try {
+      let logoUrl: string | null = null;
+      if (logoFile) {
+        const logoResponse = await fetch('/api/logos', {
+          method: 'POST',
+          headers: { 'Content-Type': logoFile.type },
+          body: logoFile,
+        });
+        const logo = await logoResponse.json() as { logo_url?: string; error?: string };
+        if (!logoResponse.ok || !logo.logo_url) throw new Error(logo.error ?? 'Could not upload the logo.');
+        logoUrl = logo.logo_url;
+      }
       const checkoutResponse = await fetch('/api/bid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           country_code: selected.code,
-          logo_url: null,
+          logo_url: logoUrl,
           link_url: companyUrl,
           company_name: companyName,
           business_description: businessDescription,
@@ -402,26 +419,26 @@ export function WorldMarketplace() {
             <label className="search-field"><span className="sr-only">Search countries</span><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search country" /></label>
           </div>
 
-          <div className="map-wrap">
+          <div className="map-wrap" ref={mapWrapRef}>
             <div className={`map-viewport ${mapDragging ? 'map-dragging' : ''}`} ref={mapViewportRef} onPointerDown={startMapDrag} onPointerMove={moveMap} onPointerUp={stopMapDrag} onPointerCancel={stopMapDrag}>
               <div className="map-stage" style={{ width: `${mapZoom * 100}%`, height: `${mapZoom * 100}%` }}>
             {mapData ? <svg viewBox={mapData.viewBox} role="img" aria-labelledby="world-map-title">
               <title id="world-map-title">Interactive map of advertising spots by country</title>
-              <defs><linearGradient id="colorful-border" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ff5d7d" /><stop offset=".28" stopColor="#ffbf47" /><stop offset=".52" stopColor="#d8ff68" /><stop offset=".76" stopColor="#58b8ff" /><stop offset="1" stopColor="#a878ff" /></linearGradient>{spots.map((spot, index) => {
-                if (spot.logoUrl) return <pattern key={spot.code} id={`logo-${spot.code}`} width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill="#fff" /><image href={spot.logoUrl} width="1" height="1" preserveAspectRatio="xMidYMid slice" /></pattern>;
-                const lines = descriptionLines(spot.businessDescription);
-                return <pattern key={spot.code} id={`brand-${spot.code}`} width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill={palette[index % palette.length]} /><text x=".5" y=".4" textAnchor="middle" fill="#17231f" fontSize=".1" fontWeight="900">{spot.companyName?.slice(0, 18)}</text><text x=".5" y=".54" textAnchor="middle" fill="#263a33" fontSize=".055" fontWeight="700">{lines[0]}</text><text x=".5" y=".63" textAnchor="middle" fill="#263a33" fontSize=".055" fontWeight="700">{lines[1]}</text></pattern>;
-              })}</defs>
+              <defs><linearGradient id="colorful-border" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ff5d7d" /><stop offset=".28" stopColor="#ffbf47" /><stop offset=".52" stopColor="#d8ff68" /><stop offset=".76" stopColor="#58b8ff" /><stop offset="1" stopColor="#a878ff" /></linearGradient></defs>
               {mapData.locations.map((location) => {
                 const spot = spotMap.get(location.id);
                 const isSelected = selected.code === location.id;
                 const hiddenBySearch = query.length > 0 && !matchingCodes.has(location.id);
-                const fill = spot?.logoUrl ? `url(#logo-${spot.code})` : spot ? `url(#brand-${spot.code})` : undefined;
-                return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${spot?.colorfulBorder ? 'country-colorful-border' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={{ ...(fill ? { fill } : {}), ...(spot?.colorfulBorder ? { stroke: 'url(#colorful-border)' } : {}) }} role="button" tabIndex={0} aria-label={`${location.name}, ${spot?.isDemo ? 'available from $50 with a demo brand preview' : spot ? `${money.format(spot.currentBid)} current value` : 'available from $50'}`} onClick={() => { if (!mapDragRef.current.moved) selectCountry(location.id, location.name, true); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectCountry(location.id, location.name, true); } }} />;
+                const countryStyle = spot ? { '--spot-color': countryColor(spot.code), ...(spot.colorfulBorder ? { stroke: 'url(#colorful-border)' } : {}) } as CSSProperties : undefined;
+                return <path key={location.id} id={`country-${location.id}`} d={location.path} className={`country ${spot ? 'country-owned' : ''} ${spot?.colorfulBorder ? 'country-colorful-border' : ''} ${isSelected ? 'country-selected' : ''} ${hiddenBySearch ? 'country-muted' : ''}`} style={countryStyle} role="button" tabIndex={0} aria-label={`${location.name}, ${spot?.isDemo ? 'available from $50 with a demo brand preview' : spot ? `${money.format(spot.currentBid)} current value` : 'available from $50'}`} onPointerEnter={(event) => showCountryPreview(event, spot, location.name)} onPointerMove={(event) => showCountryPreview(event, spot, location.name)} onPointerLeave={() => setHoveredCountry(null)} onFocus={(event) => { const wrapBounds = mapWrapRef.current?.getBoundingClientRect(); const countryBounds = event.currentTarget.getBoundingClientRect(); if (wrapBounds) setHoveredCountry({ spot, name: location.name, x: Math.min(Math.max(14, wrapBounds.width - 324), Math.max(14, countryBounds.right - wrapBounds.left + 12)), y: Math.min(Math.max(14, wrapBounds.height - 174), Math.max(14, countryBounds.top - wrapBounds.top)) }); }} onBlur={() => setHoveredCountry(null)} onClick={() => { if (!mapDragRef.current.moved) { setHoveredCountry(null); selectCountry(location.id, location.name, true); } }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setHoveredCountry(null); selectCountry(location.id, location.name, true); } }} />;
               })}
             </svg> : mapLoadError ? <div className="map-loading map-load-error" role="alert"><span>The world map could not load.</span><button type="button" onClick={() => { setMapLoadError(false); setMapLoadAttempt((attempt) => attempt + 1); }}>Try again</button></div> : <div className="map-loading" role="status">Loading the world map…</div>}
               </div>
             </div>
+            {hoveredCountry && <div className="map-hover-card" style={{ left: hoveredCountry.x, top: hoveredCountry.y }} aria-hidden="true">
+              {hoveredCountry.spot?.logoUrl ? <img src={hoveredCountry.spot.logoUrl} alt="" /> : <span className="hover-brand-mark" style={{ background: hoveredCountry.spot ? countryColor(hoveredCountry.spot.code) : undefined }}>{hoveredCountry.spot ? brandInitials(hoveredCountry.spot.companyName) : hoveredCountry.name.slice(0, 2).toUpperCase()}</span>}
+              <div><small>{hoveredCountry.spot ? 'Brand live' : 'Available country'}</small><strong>{hoveredCountry.spot?.companyName ?? hoveredCountry.name}</strong><p>{hoveredCountry.spot?.businessDescription ?? `Claim ${hoveredCountry.name} from $50.`}</p>{hoveredCountry.spot && <b>{hoveredCountry.name} · {hoveredCountry.spot.currentBid ? money.format(hoveredCountry.spot.currentBid) : 'Demo'}</b>}</div>
+            </div>}
             <div className="map-controls" aria-label="Map zoom controls" onPointerDown={(event) => event.stopPropagation()}>
               <button type="button" onClick={() => setMapZoom(mapZoom - 0.5)} disabled={mapZoom <= 1} aria-label="Zoom out">−</button>
               <span aria-live="polite">{Math.round(mapZoom * 100)}%</span>
@@ -431,7 +448,7 @@ export function WorldMarketplace() {
             {mapBidCardOpen && <aside className="map-bid-card" aria-label={`Bid on ${selected.name}`} onPointerDown={(event) => event.stopPropagation()}>
               <button className="map-card-close" type="button" onClick={() => setMapBidCardOpen(false)} aria-label="Close selected country">×</button>
               <div className="map-card-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><small>Selected country</small><strong>{selected.name}</strong>{selected.companyName && <span className="map-card-brand">{selected.companyName}{selected.isDemo ? ' · Demo preview' : ''}</span>}</div></div>
-              {selected.companyName ? <div className="map-card-company"><small>Current company</small><strong>{selected.companyName}</strong><p>{selected.businessDescription ?? 'No company description was provided.'}</p></div> : <div className="map-card-company map-card-available"><small>Current company</small><strong>This country is available</strong><p>Be the first brand to claim this spot.</p></div>}
+              {selected.companyName ? <div className="map-card-company map-card-company-profile">{selected.logoUrl ? <img src={selected.logoUrl} alt={`${selected.companyName} logo`} /> : <span className="map-card-logo-fallback" style={{ background: countryColor(selected.code) }}>{brandInitials(selected.companyName)}</span>}<div><small>Current company</small><strong>{selected.companyName}</strong><p>{selected.businessDescription ?? 'No company description was provided.'}</p>{selected.companyUrl && <a href={selected.companyUrl} target="_blank" rel="noopener noreferrer">Visit company ↗</a>}</div></div> : <div className="map-card-company map-card-available"><small>Current company</small><strong>This country is available</strong><p>Be the first brand to claim this spot.</p></div>}
               <div className="map-card-values"><span><small>Current value</small><strong>{selected.currentBid ? money.format(selected.currentBid) : 'Available'}</strong></span><span><small>Your bid</small><strong>{money.format(nextBid)}</strong></span></div>
               <div className="map-card-history"><div className="map-card-history-title"><strong>Last 5 owners</strong>{selected.isDemo && <small>Example history</small>}</div>{historyLoadingCode === selected.code ? <p className="history-empty">Loading owner history…</p> : selectedHistory.length ? <ol>{selectedHistory.slice(0, 5).map((owner, index) => <li key={`${owner.companyName}-${owner.completedAt}-${index}`}><span><b>{owner.companyName}</b><small>{activityTime(owner.completedAt)}</small></span><strong>{money.format(owner.amount)}</strong></li>)}</ol> : <p className="history-empty">No previous owners yet.</p>}</div>
               <button className="primary-button" type="button" onClick={() => { setFormError(''); setBidOpen(true); }}>Claim {selected.name} · {money.format(nextBid)}</button>
@@ -485,7 +502,7 @@ export function WorldMarketplace() {
             <label>Project category<select required value={projectCategory} onChange={(event) => setProjectCategory(event.target.value)}><option value="" disabled>Choose a category</option>{PROJECT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
             <label className={`border-addon ${colorfulBorder ? 'border-addon-selected' : ''}`}><input type="checkbox" checked={colorfulBorder} onChange={(event) => setColorfulBorder(event.target.checked)} /><span className="border-addon-swatch" aria-hidden="true" /><span><strong>Add a colorful country border</strong><small>Makes your active country easier to notice on the map.</small></span><b>+{money.format(COLOR_BORDER_ADDON_DOLLARS)}</b></label>
             <p className="checkout-charity"><strong>{CHARITY_SHARE_PERCENT}% gives back.</strong> Worldspot donates 10% of its country-placement income to vetted charities.</p>
-            <label>Company logo <small>Optional · PNG, JPG, or WebP · max 750 KB</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)} /></label>
+            <label>Company logo <small>Optional · PNG, JPG, or WebP · max 750 KB</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file && (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 750 * 1024)) { setLogoFile(null); setFormError('Choose a PNG, JPG, or WebP logo under 750 KB.'); event.target.value = ''; return; } setFormError(''); setLogoFile(file); }} /></label>
             {formError && <p className="form-error" role="alert">{formError}</p>}
             <button className="checkout-button" disabled={submitting} type="submit">{submitting ? 'Preparing secure checkout…' : `Continue to Stripe · ${money.format(checkoutTotal)}`}</button>
           </form>}
