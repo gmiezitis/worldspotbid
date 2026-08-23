@@ -140,6 +140,64 @@ app.get('/api/countries', async (_request, response) => {
   }
 });
 
+app.get('/api/activity', async (_request, response) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        LOWER(country_code) AS code,
+        amount,
+        COALESCE(company_name, 'A new brand') AS "companyName",
+        project_category AS "projectCategory",
+        FLOOR(EXTRACT(EPOCH FROM COALESCE(accepted_at, created_at)) * 1000)::BIGINT AS "completedAt"
+      FROM bids
+      WHERE status = 'accepted'
+      ORDER BY COALESCE(accepted_at, created_at) DESC
+      LIMIT 12
+    `);
+
+    response.json({
+      latestActivity: result.rows.map((activity) => ({
+        ...activity,
+        countryName: activity.code.toUpperCase(),
+        amount: Number(activity.amount),
+        completedAt: Number(activity.completedAt),
+      })),
+    });
+  } catch (error) {
+    console.error('Unable to load latest activity:', error.message);
+    response.status(500).json({ error: 'Unable to load latest activity.' });
+  }
+});
+
+app.get('/api/country-history', async (request, response) => {
+  const countryCode = normalizeCountryCode(request.query.country);
+  if (!countryCode.ok) return response.status(400).json({ error: countryCode.error });
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        COALESCE(company_name, 'Previous brand') AS "companyName",
+        amount,
+        FLOOR(EXTRACT(EPOCH FROM COALESCE(accepted_at, created_at)) * 1000)::BIGINT AS "completedAt"
+      FROM bids
+      WHERE country_code = $1 AND status = 'accepted'
+      ORDER BY COALESCE(accepted_at, created_at) DESC
+      LIMIT 5
+    `, [countryCode.value]);
+
+    response.json({
+      owners: result.rows.map((owner) => ({
+        ...owner,
+        amount: Number(owner.amount),
+        completedAt: Number(owner.completedAt),
+      })),
+    });
+  } catch (error) {
+    console.error('Unable to load country history:', error.message);
+    response.status(500).json({ error: 'Unable to load country history.' });
+  }
+});
+
 app.get('/api/order-status', async (request, response) => {
   const sessionId = request.query.session_id;
   if (typeof sessionId !== 'string' || !/^cs_test_[A-Za-z0-9_]+$/.test(sessionId)) {
