@@ -6,7 +6,7 @@ import './globals.css';
 const manrope = Manrope({ variable: '--font-manrope', subsets: ['latin'] });
 
 const title = 'Worldspot — Put your brand on the world';
-const description = 'Bid for one exclusive advertising spot in every country on the world map.';
+const description = 'Purchase a featured advertising placement on the world map, one country at a time.';
 
 export function generateMetadata(): Metadata {
   const configured = env.PUBLIC_APP_ORIGIN;

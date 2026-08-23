@@ -368,7 +368,7 @@ app.post('/api/bid', async (request, response) => {
           unit_amount: newPrice * 100,
           product_data: {
             name: `${countryCode.value} country placement`,
-            description: 'One-hour WorldSpotBid country placement in Stripe sandbox mode.',
+            description: 'Temporary Worldspot country advertising placement in Stripe sandbox mode.',
           },
         },
       }, ...(colorfulBorder ? [{

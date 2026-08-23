@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const user = await getChatGPTUser();
-    if (!user) throw new ApiError(401, 'Sign in to place a bid.');
+    if (!user) throw new ApiError(401, 'Sign in to purchase a placement.');
     const body = await readJsonObject(request);
     const country = getCountry(body.countryCode);
     const companyName = cleanText(body.companyName, 'Company name', 2, 60);
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
           unit_amount: amountCents,
           product_data: {
             name: `${country.name} advertising spot`,
-            description: `${projectCategory} placement for at least one hour; remains visible until a higher bid is accepted.`,
+            description: `${projectCategory} placement guaranteed for at least one hour; remains active until a later qualifying purchase replaces it.`,
           },
         },
       }, ...(colorfulBorder ? [{

@@ -80,9 +80,9 @@ function countryColor(code: string) {
 }
 
 function timeLabel(until?: number) {
-  if (!until) return 'Visible until outbid';
+  if (!until) return 'Active until replaced';
   const minutes = Math.max(0, Math.ceil((Number(until) - Date.now()) / 60_000));
-  return minutes > 0 ? `${minutes} min guaranteed` : 'Visible until outbid';
+  return minutes > 0 ? `${minutes} min guaranteed` : 'Active until replaced';
 }
 
 function activityTime(timestamp: number) {
@@ -130,6 +130,7 @@ export function WorldMarketplace() {
   const mapDragRef = useRef({ pointerId: -1, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0, moved: false });
 
   const spotMap = useMemo(() => new Map(spots.map((spot) => [spot.code, spot])), [spots]);
+  const logoPreviewUrl = useMemo(() => logoFile ? URL.createObjectURL(logoFile) : null, [logoFile]);
   const matchingCodes = useMemo(() => {
     const locations = mapData?.locations ?? [];
     const normalizedQuery = query.trim().toLowerCase();
@@ -166,6 +167,8 @@ export function WorldMarketplace() {
     void loadMap();
     return () => controller.abort();
   }, [mapLoadAttempt]);
+
+  useEffect(() => () => { if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl); }, [logoPreviewUrl]);
 
   const loadMarket = useCallback(async () => {
     try {
@@ -235,7 +238,7 @@ export function WorldMarketplace() {
           const order = await response.json() as { status: string; countryName: string };
           if (order.status === 'accepted') { setNotice(`Your ${order.countryName} spot is live.`); void loadMarket(); return; }
           if (order.status === 'stale') { setNotice('Another brand claimed this spot first. Your card authorization was cancelled.'); return; }
-          if (order.status === 'payment_failed') { setNotice('The payment could not be completed. No bid was placed.'); return; }
+          if (order.status === 'payment_failed') { setNotice('The payment could not be completed. No placement was activated.'); return; }
         }
       } catch { /* retry briefly while the webhook arrives */ }
       if (attempts < 10) window.setTimeout(check, 1_500);
@@ -404,12 +407,12 @@ export function WorldMarketplace() {
 
       <section className="intro" id="top">
         <div className="intro-heading"><p className="eyebrow"><span /> One country. One spotlight. Your brand.</p><h1><span>Put your brand</span><em>on the world.</em></h1></div>
-        <div className="intro-copy"><p>Choose the country that matters to your business. Claim its only featured spot from $50 and stay visible until another brand outbids you.</p><div className="hero-actions"><a className="hero-primary" href="#market">Claim your country <span aria-hidden="true">→</span></a><a className="hero-secondary" href="#how-it-works">How it works</a></div><small>Secure Stripe sandbox checkout · $50 bid steps</small></div>
+        <div className="intro-copy"><p>Choose the country that matters to your business. Purchase its featured advertising placement from $50 and remain visible until a later qualifying purchase replaces it.</p><div className="hero-actions"><a className="hero-primary" href="#market">Choose a country <span aria-hidden="true">→</span></a><a className="hero-secondary" href="#how-it-works">How it works</a></div><small>Secure Stripe sandbox checkout · fixed $50 placement steps</small></div>
       </section>
 
-      <section className="activity-ticker" aria-label="Latest accepted bids">
+      <section className="activity-ticker" aria-label="Latest activated placements">
         <div className="ticker-label"><i aria-hidden="true" /><span>Live activity</span></div>
-        <div className="ticker-window"><div className="ticker-track">{[0, 1].map((group) => <div className="ticker-group" key={group} aria-hidden={group === 1}>{latestActivity.length ? latestActivity.map((activity, index) => <button type="button" tabIndex={group === 1 ? -1 : 0} key={`${group}-${activity.code}-${activity.completedAt}-${index}`} onClick={() => { selectCountry(activity.code, activity.countryName, true); document.getElementById('market')?.scrollIntoView({ behavior: 'smooth' }); }}><span>{countryFlag(activity.code)}</span><strong>{activity.companyName}</strong><span>bid {money.format(activity.amount)} for {activity.countryName}</span><small>{activityTime(activity.completedAt)}</small></button>) : <span className="ticker-empty"><b>Live market</b> The next securely accepted country bid will appear here automatically.</span>}</div>)}</div></div>
+        <div className="ticker-window"><div className="ticker-track">{[0, 1].map((group) => <div className="ticker-group" key={group} aria-hidden={group === 1}>{latestActivity.length ? latestActivity.map((activity, index) => <button type="button" tabIndex={group === 1 ? -1 : 0} key={`${group}-${activity.code}-${activity.completedAt}-${index}`} onClick={() => { selectCountry(activity.code, activity.countryName, true); document.getElementById('market')?.scrollIntoView({ behavior: 'smooth' }); }}><span>{countryFlag(activity.code)}</span><strong>{activity.companyName}</strong><span>activated a {money.format(activity.amount)} placement in {activity.countryName}</span><small>{activityTime(activity.completedAt)}</small></button>) : <span className="ticker-empty"><b>Live market</b> The next securely activated country placement will appear here automatically.</span>}</div>)}</div></div>
       </section>
 
       <section className="market" id="market" aria-label="Live country marketplace">
@@ -445,13 +448,13 @@ export function WorldMarketplace() {
               <button type="button" onClick={() => setMapZoom(mapZoom + 0.5)} disabled={mapZoom >= MAX_MAP_ZOOM} aria-label="Zoom in">+</button>
               {mapZoom > 1 && <button className="map-reset" type="button" onClick={() => setMapZoom(1)}>Reset</button>}
             </div>
-            {mapBidCardOpen && <aside className="map-bid-card" aria-label={`Bid on ${selected.name}`} onPointerDown={(event) => event.stopPropagation()}>
+            {mapBidCardOpen && <aside className="map-bid-card" aria-label={`Placement details for ${selected.name}`} onPointerDown={(event) => event.stopPropagation()}>
               <button className="map-card-close" type="button" onClick={() => setMapBidCardOpen(false)} aria-label="Close selected country">×</button>
               <div className="map-card-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><small>Selected country</small><strong>{selected.name}</strong>{selected.companyName && <span className="map-card-brand">{selected.companyName}{selected.isDemo ? ' · Demo preview' : ''}</span>}</div></div>
               {selected.companyName ? <div className="map-card-company map-card-company-profile">{selected.logoUrl ? <img src={selected.logoUrl} alt={`${selected.companyName} logo`} /> : <span className="map-card-logo-fallback" style={{ background: countryColor(selected.code) }}>{brandInitials(selected.companyName)}</span>}<div><small>Current company</small><strong>{selected.companyName}</strong><p>{selected.businessDescription ?? 'No company description was provided.'}</p>{selected.companyUrl && <a href={selected.companyUrl} target="_blank" rel="noopener noreferrer">Visit company ↗</a>}</div></div> : <div className="map-card-company map-card-available"><small>Current company</small><strong>This country is available</strong><p>Be the first brand to claim this spot.</p></div>}
-              <div className="map-card-values"><span><small>Current value</small><strong>{selected.currentBid ? money.format(selected.currentBid) : 'Available'}</strong></span><span><small>Your bid</small><strong>{money.format(nextBid)}</strong></span></div>
+              <div className="map-card-values"><span><small>Current placement</small><strong>{selected.currentBid ? money.format(selected.currentBid) : 'Available'}</strong></span><span><small>Activation price</small><strong>{money.format(nextBid)}</strong></span></div>
               <div className="map-card-history"><div className="map-card-history-title"><strong>Last 5 owners</strong>{selected.isDemo && <small>Example history</small>}</div>{historyLoadingCode === selected.code ? <p className="history-empty">Loading owner history…</p> : selectedHistory.length ? <ol>{selectedHistory.slice(0, 5).map((owner, index) => <li key={`${owner.companyName}-${owner.completedAt}-${index}`}><span><b>{owner.companyName}</b><small>{activityTime(owner.completedAt)}</small></span><strong>{money.format(owner.amount)}</strong></li>)}</ol> : <p className="history-empty">No previous owners yet.</p>}</div>
-              <button className="primary-button" type="button" onClick={() => { setFormError(''); setBidOpen(true); }}>Claim {selected.name} · {money.format(nextBid)}</button>
+              <button className="primary-button" type="button" onClick={() => { setFormError(''); setBidOpen(true); }}>Activate placement · {money.format(nextBid)}</button>
             </aside>}
             <div className="map-legend" aria-hidden="true"><span><i className="legend-available" /> Available</span><span><i className="legend-owned" /> Brand live</span></div>
             <p className="map-credit">Map © SVG Maps, CC BY 4.0</p>
@@ -459,9 +462,9 @@ export function WorldMarketplace() {
 
           <div className="selection-bar" aria-live="polite">
             <div className="selected-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><small>Selected country</small><strong>{selected.name}</strong>{selected.companyUrl && <a href={selected.companyUrl} target="_blank" rel="noopener noreferrer">{selected.companyName} ↗</a>}{selected.businessDescription && <p className="selected-description">{selected.businessDescription}</p>}</div></div>
-            <div className="selection-stat"><small>Current value</small><strong>{selected.currentBid ? money.format(selected.currentBid) : 'Available'}</strong></div>
-            <div className="selection-stat"><small>Next bid</small><strong>{money.format(nextBid)}</strong></div>
-            <button className="primary-button" type="button" onClick={() => { setFormError(''); setBidOpen(true); }}>Claim {selected.name}</button>
+            <div className="selection-stat"><small>Current placement</small><strong>{selected.currentBid ? money.format(selected.currentBid) : 'Available'}</strong></div>
+            <div className="selection-stat"><small>Activation price</small><strong>{money.format(nextBid)}</strong></div>
+            <button className="primary-button" type="button" onClick={() => { setFormError(''); setBidOpen(true); }}>Place your brand</button>
           </div>
         </div>
 
@@ -480,12 +483,12 @@ export function WorldMarketplace() {
       </section>
 
       <section className="how-it-works" id="how-it-works">
-        <p className="section-kicker">A simpler global billboard</p><h2>One clear rule.<br />The highest bid stays.</h2>
-        <div className="steps"><article><span>01</span><h3>Pick your market</h3><p>Select any country on the map. Empty spots begin at $50.</p></article><article><span>02</span><h3>Bid securely</h3><p>Every new bid is exactly $50 higher and is authorized through Stripe.</p></article><article><span>03</span><h3>Own the spotlight</h3><p>Your brand appears for at least one hour, then stays until it is outbid.</p></article></div>
+        <p className="section-kicker">A simpler global billboard</p><h2>One transparent rule.<br />The latest qualifying placement stays active.</h2>
+        <div className="steps"><article><span>01</span><h3>Choose your market</h3><p>Select any country on the map. Available placements begin at $50.</p></article><article><span>02</span><h3>Purchase securely</h3><p>The placement price advances in fixed $50 steps and checkout is authorized through Stripe.</p></article><article><span>03</span><h3>Activate your brand</h3><p>Your advertising placement is guaranteed for one hour and continues until a later qualifying purchase replaces it.</p></article></div>
       </section>
 
       <section className="charity-card" id="charity" aria-labelledby="charity-title">
-        <strong className="charity-percent">{CHARITY_SHARE_PERCENT}%</strong><div className="charity-message"><p className="section-kicker">Giving is built in</p><h2 id="charity-title">Every accepted bid gives something back.</h2><p>Worldspot donates 10% of its country-placement income to vetted charities and publishes monthly proof of payment. No voting, no extra steps—your brand’s visibility automatically helps support real-world work.</p><small>The donation is made by Worldspot and is not a tax-deductible donation by the buyer.</small></div><span className="charity-mark" aria-hidden="true">♥</span>
+        <strong className="charity-percent">{CHARITY_SHARE_PERCENT}%</strong><div className="charity-message"><p className="section-kicker">Giving is built in</p><h2 id="charity-title">Every activated placement gives something back.</h2><p>Worldspot donates 10% of its country-placement income to vetted charities and publishes monthly proof of payment. No voting, no extra steps—your brand’s visibility automatically helps support real-world work.</p><small>The donation is made by Worldspot and is not a tax-deductible donation by the purchaser.</small></div><span className="charity-mark" aria-hidden="true">♥</span>
       </section>
 
       <footer id="rules"><div className="brand"><span className="brand-mark">W</span><span>WORLDSPOT</span></div><p>Advertising placement marketplace. Country spots do not represent ownership of land or territory.</p><p>© 2026 Worldspot</p></footer>
@@ -493,8 +496,8 @@ export function WorldMarketplace() {
       {bidOpen && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) setBidOpen(false); }}>
         <section className="bid-modal" role="dialog" aria-modal="true" aria-labelledby="bid-title">
           <button className="modal-close" type="button" onClick={() => setBidOpen(false)} disabled={submitting} aria-label="Close">×</button>
-          <div className="modal-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><p className="section-kicker">Exclusive country spot</p><h2 id="bid-title">Claim {selected.name}</h2></div></div>
-          <div className="bid-summary"><span><small>Country bid</small><strong>{money.format(nextBid)}</strong></span><span><small>Color border</small><strong>{colorfulBorder ? `+${money.format(COLOR_BORDER_ADDON_DOLLARS)}` : 'Not added'}</strong></span><span><small>Total</small><strong>{money.format(checkoutTotal)}</strong></span></div>
+          <div className="modal-country"><span className="flag" aria-hidden="true">{selected.flag}</span><div><p className="section-kicker">Temporary advertising placement</p><h2 id="bid-title">Activate {selected.name}</h2></div></div>
+          <div className="bid-summary"><span><small>Placement price</small><strong>{money.format(nextBid)}</strong></span><span><small>Color border</small><strong>{colorfulBorder ? `+${money.format(COLOR_BORDER_ADDON_DOLLARS)}` : 'Not added'}</strong></span><span><small>Total</small><strong>{money.format(checkoutTotal)}</strong></span></div>
           {!paymentsEnabled && liveData ? <div className="setup-message"><strong>Secure checkout is not live yet.</strong><p>The marketplace is ready for Stripe test keys before accepting any payment.</p></div> : <form onSubmit={submitBid}>
             <label>Company name<input required minLength={2} maxLength={60} value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Acme Studio" /></label>
             <label>Company website<input required type="url" value={companyUrl} onChange={(event) => setCompanyUrl(event.target.value)} placeholder="https://example.com" /></label>
@@ -502,11 +505,11 @@ export function WorldMarketplace() {
             <label>Project category<select required value={projectCategory} onChange={(event) => setProjectCategory(event.target.value)}><option value="" disabled>Choose a category</option>{PROJECT_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
             <label className={`border-addon ${colorfulBorder ? 'border-addon-selected' : ''}`}><input type="checkbox" checked={colorfulBorder} onChange={(event) => setColorfulBorder(event.target.checked)} /><span className="border-addon-swatch" aria-hidden="true" /><span><strong>Add a colorful country border</strong><small>Makes your active country easier to notice on the map.</small></span><b>+{money.format(COLOR_BORDER_ADDON_DOLLARS)}</b></label>
             <p className="checkout-charity"><strong>{CHARITY_SHARE_PERCENT}% gives back.</strong> Worldspot donates 10% of its country-placement income to vetted charities.</p>
-            <label>Company logo <small>Optional · PNG, JPG, or WebP · max 750 KB</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file && (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 750 * 1024)) { setLogoFile(null); setFormError('Choose a PNG, JPG, or WebP logo under 750 KB.'); event.target.value = ''; return; } setFormError(''); setLogoFile(file); }} /></label>
+            <label>Company logo <small>Optional · appears in the country hover card and leaderboard · PNG, JPG, or WebP · max 750 KB</small>{logoPreviewUrl && <span className="logo-upload-preview"><img src={logoPreviewUrl} alt="Selected company logo preview" /><span><strong>Logo ready</strong><small>This is how your uploaded brand asset will appear.</small></span></span>}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0] ?? null; if (file && (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 750 * 1024)) { setLogoFile(null); setFormError('Choose a PNG, JPG, or WebP logo under 750 KB.'); event.target.value = ''; return; } setFormError(''); setLogoFile(file); }} /></label>
             {formError && <p className="form-error" role="alert">{formError}</p>}
             <button className="checkout-button" disabled={submitting} type="submit">{submitting ? 'Preparing secure checkout…' : `Continue to Stripe · ${money.format(checkoutTotal)}`}</button>
           </form>}
-          <p className="bid-terms">This is an advertising placement, not land ownership or a tax-deductible donation. Your card is captured only if this bid is accepted. If another completed checkout wins first, the authorization is cancelled.</p>
+          <p className="bid-terms">This checkout purchases temporary digital advertising placement only. It does not grant land ownership, territorial rights, or exclusivity outside the displayed map placement. Payment is captured only when the placement activates. If another eligible checkout completes first, your authorization is cancelled. The charity allocation is made by Worldspot and is not a tax-deductible donation by the purchaser.</p>
         </section>
       </div>}
     </main>

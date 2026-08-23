@@ -209,6 +209,11 @@ footer p:last-child { text-align: right; }
 .bid-modal input:focus, .bid-modal select:focus, .bid-modal textarea:focus { border-color: #6f8279; box-shadow: 0 0 0 3px rgba(36,75,64,.08); }
 .bid-modal input[type='file'] { padding: 10px; height: auto; color: #6f7974; }
 .bid-modal input[type='file']::file-selector-button { margin-right: 10px; padding: 7px 9px; border: 0; border-radius: 6px; color: var(--ink); background: #e9ece4; cursor: pointer; font-size: 10px; font-weight: 800; }
+.logo-upload-preview { padding: 11px; display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: center; gap: 12px; border: 1px solid color-mix(in srgb, var(--green) 35%, var(--line)); border-radius: 11px; background: color-mix(in srgb, var(--lime) 11%, var(--card)); text-transform: none; letter-spacing: 0; }
+.logo-upload-preview img { width: 54px; height: 54px; border: 1px solid var(--line); border-radius: 10px; object-fit: contain; background: white; }
+.logo-upload-preview > span { display: flex; flex-direction: column; gap: 4px; }
+.logo-upload-preview strong { color: var(--ink); font-size: 11px; }
+.bid-modal form label .logo-upload-preview small { color: var(--muted); font-size: 9px; line-height: 1.4; }
 .bid-modal form label.border-addon { padding: 13px; display: grid; grid-template-columns: 18px 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 11px; cursor: pointer; text-transform: none; letter-spacing: 0; }
 .bid-modal form label.border-addon-selected { border-color: #7a65cf; box-shadow: 0 0 0 3px rgba(122,101,207,.09); }
 .bid-modal .border-addon input { width: 16px; height: 16px; accent-color: #7a65cf; }
