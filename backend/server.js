@@ -271,7 +271,6 @@ app.post('/api/bid', async (request, response) => {
 
     checkoutSession = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
       success_url: `${publicAppOrigin}/?payment=processing&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${publicAppOrigin}/?payment=cancelled`,
       expires_at: Math.floor(new Date(bidResult.rows[0].checkout_expires_at).getTime() / 1000),
